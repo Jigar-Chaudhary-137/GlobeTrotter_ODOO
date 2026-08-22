@@ -1,6 +1,6 @@
 # GlobeTrotter — Member 3 API Contracts & Integration Guide
 
-This document specifies the exact request parameters, response schemas, and integration guidelines for all Member 3 travel, location, activity, recommendation, and weather endpoints.
+This document specifies the exact request parameters, response schemas, and integration guidelines for all Member 3 travel, location, activity, recommendation, place details, and weather endpoints.
 
 ---
 
@@ -11,6 +11,7 @@ This document specifies the exact request parameters, response schemas, and inte
 | `/api/explore/cities` | `GET` | Worldwide destination & city search |
 | `/api/explore/activities` | `GET` | Points of interest & activity search |
 | `/api/explore/recommendations` | `GET` | Categorized place recommendations |
+| `/api/explore/place/:id` | `GET` | Detailed place & activity information |
 | `/api/weather` | `GET` | Weather forecast by city or coordinates |
 
 ---
@@ -127,7 +128,64 @@ GET /api/explore/activities?city=Paris&category=attractions
 
 ---
 
-## 3. Categorized Recommendations API
+## 3. Place Details API
+
+### `GET /api/explore/place/:id`
+
+Retrieves detailed information for a specific place/activity using Geoapify Place Details API with Nominatim Details secondary fallback.
+
+#### Path Parameter:
+* `id` *(string, required)*: Unique place identifier (e.g. `97283443` or Geoapify `place_id`).
+
+#### Example Request:
+```http
+GET /api/explore/place/97283443
+```
+
+#### Successful Response (`200 OK`):
+```json
+{
+  "success": true,
+  "message": "Place details retrieved successfully",
+  "data": {
+    "id": "97283443",
+    "name": "Point zéro des Routes de France",
+    "category": "attractions",
+    "address": "Point zéro des Routes de France, Parvis Notre-Dame - Place Jean-Paul II, Paris",
+    "city": "Paris",
+    "country": "France",
+    "lat": 48.8534015,
+    "lng": 2.3487885,
+    "description": "Point zéro des Routes de France in Paris",
+    "rating": 4.5,
+    "priceCategory": "$",
+    "website": null,
+    "phone": null,
+    "openingHours": null,
+    "distanceKm": 0
+  }
+}
+```
+
+#### Field Definitions & Optional Status:
+* `id` *(string, required)*: Place ID reference.
+* `name` *(string, required)*: Place title.
+* `category` *(string, required)*: Normalized category (`attractions`, `culture`, `dining`, etc.).
+* `address` *(string, required)*: Formatted address string.
+* `city` *(string|null, optional)*: City name.
+* `country` *(string|null, optional)*: Country name.
+* `lat` / `lng` *(number, required)*: Latitude and Longitude decimal coordinates.
+* `description` *(string, optional)*: Place description summary.
+* `rating` *(number, optional)*: Popularity rating (1.0 - 5.0).
+* `priceCategory` *(string, optional)*: Price tier indicator (`Free`, `$`, `$$`, `$$$`).
+* `website` *(string|null, optional)*: Official website URL (or `null` if unavailable).
+* `phone` *(string|null, optional)*: Contact phone number (or `null` if unavailable).
+* `openingHours` *(string|null, optional)*: Operating hours (or `null` if unavailable).
+* `distanceKm` *(number, optional)*: Haversine distance in km.
+
+---
+
+## 4. Categorized Recommendations API
 
 ### `GET /api/explore/recommendations`
 
@@ -166,7 +224,7 @@ GET /api/explore/recommendations?city=Paris
 
 ---
 
-## 4. Weather Forecast API
+## 5. Weather Forecast API
 
 ### `GET /api/weather`
 
@@ -231,7 +289,7 @@ This section outlines how Member 1 (Frontend) passes selected destination and ac
        ▼ (Passed to Trip Builder state)
 [ Trip Builder ]
        │
-       ▼ (User picks activities from /api/explore/activities)
+       ▼ (User picks activities from /api/explore/activities or /api/explore/place/:id)
 [ Normalized Activity Objects ]
        │
        ▼ (Submitted to Member 2 Trip API)
@@ -255,7 +313,7 @@ When a user selects a destination from `/api/explore/cities`, the complete norma
 ```
 
 ### 2. Activity Handoff Payload (Explore ➔ Trip Builder)
-When a user adds an activity from `/api/explore/activities`, the complete normalized object is:
+When a user adds an activity from `/api/explore/activities` or `/api/explore/place/:id`, the complete normalized object is:
 ```json
 {
   "id": "97283443",
@@ -300,6 +358,7 @@ Member 3 provides helper functions in `server/src/utils/travelUtils.js` for quic
 | Status | Cause | Response Structure |
 | :--- | :--- | :--- |
 | `400 Bad Request` | Missing required parameters or invalid coordinate range | `{"success": false, "message": "Please provide either a city name or latitude and longitude coordinates."}` |
+| `404 Not Found` | Specified Place ID does not exist | `{"success": false, "message": "Place details are temporarily unavailable", "data": null}` |
 | `503 Service Unavailable` | Live external API failed or timed out | `{"success": false, "message": "Travel data is temporarily unavailable", "data": []}` |
 
 ---
@@ -309,7 +368,8 @@ Member 3 provides helper functions in `server/src/utils/travelUtils.js` for quic
 ### Member 1 (Frontend):
 1. **Destination Search**: Bind your location autocomplete input to `GET /api/explore/cities?q={inputValue}`.
 2. **Activity & Weather Coupling**: When a user selects a destination, pass the normalized `name`, `lat`, and `lng` directly into `GET /api/explore/activities?city={name}&lat={lat}&lng={lng}` and `GET /api/weather?lat={lat}&lng={lng}`.
-3. **Display Badges**: Render `distanceKm` (e.g., `0.3 km away`) and `priceCategory` (`Free`, `$`, `$$`) directly on activity cards.
+3. **Place Details View**: When a user clicks on an activity card for deep details, invoke `GET /api/explore/place/{id}` to display website, phone, and opening hours if available.
+4. **Display Badges**: Render `distanceKm` (e.g., `0.3 km away`) and `priceCategory` (`Free`, `$`, `$$`) directly on activity cards.
 
 ### Member 2 (Backend & Database):
 1. **Trip Stop & Activity Storage**: When persisting a destination or activity in PostgreSQL via Prisma, save the normalized fields (`name`, `country`, `lat`, `lng`, `category`, `address`) directly.

@@ -4,7 +4,7 @@
  */
 
 const { searchDestinations } = require('../services/travel/destinationService');
-const { searchActivities: searchActivitiesService } = require('../services/travel/activityService');
+const { searchActivities: searchActivitiesService, getPlaceDetails } = require('../services/travel/activityService');
 const { getRecommendedPlaces } = require('../services/travel/recommendationService');
 
 /**
@@ -174,10 +174,51 @@ async function getRecommendationsHandler(req, res, next) {
   }
 }
 
+/**
+ * GET /api/explore/place/:id
+ * Path parameter: id (placeId)
+ */
+async function getPlaceDetailsHandler(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    if (!id || typeof id !== 'string' || id.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid place ID.'
+      });
+    }
+
+    const placeDetails = await getPlaceDetails(id.trim());
+
+    if (!placeDetails) {
+      return res.status(404).json({
+        success: false,
+        message: 'Place details are temporarily unavailable',
+        data: null
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Place details retrieved successfully',
+      data: placeDetails
+    });
+  } catch (error) {
+    console.error('[Explore Controller Place Details Error]:', error.message);
+    return res.status(503).json({
+      success: false,
+      message: 'Place details are temporarily unavailable',
+      data: null
+    });
+  }
+}
+
 module.exports = {
   getDestinationsHandler,
   getActivitiesHandler,
   getRecommendationsHandler,
+  getPlaceDetailsHandler,
   searchCities: getDestinationsHandler,
   searchActivities: getActivitiesHandler,
 };

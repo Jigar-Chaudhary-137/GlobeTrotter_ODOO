@@ -4,7 +4,7 @@
  */
 
 const axios = require('axios');
-const { normalizeActivity } = require('../../utils/dataNormalizer');
+const { normalizeActivity, normalizePlaceDetails } = require('../../utils/dataNormalizer');
 const { sortActivitiesByDistance } = require('../../utils/travelUtils');
 const { searchDestinations } = require('./destinationService');
 
@@ -127,6 +127,65 @@ async function searchActivities({ city, lat, lng, category = 'all', limit = 20 }
   return [];
 }
 
+/**
+ * Retrieves detailed place information for a specific place ID.
+ * Primary API: Geoapify Place Details API
+ * Secondary Fallback: Nominatim Details API
+ * 
+ * @param {string} placeId Unique place identifier
+ * @returns {Promise<Object|null>} Normalized place details or null
+ */
+async function getPlaceDetails(placeId) {
+  if (!placeId || typeof placeId !== 'string' || placeId.trim().length === 0) {
+    return null;
+  }
+
+  const cleanId = placeId.trim();
+  const apiKey = process.env.GEOAPIFY_API_KEY;
+
+  // Primary API: Geoapify Place Details
+  if (apiKey) {
+    try {
+      const response = await axios.get('https://api.geoapify.com/v2/place-details', {
+        params: {
+          id: cleanId,
+          apiKey: apiKey
+        },
+        timeout: 5000
+      });
+
+      if (response.data && Array.isArray(response.data.features) && response.data.features.length > 0) {
+        return normalizePlaceDetails(response.data.features[0]);
+      }
+    } catch (err) {
+      console.warn(`[Geoapify Place Details Warning]: ${err.message}. Trying secondary fallback.`);
+    }
+  }
+
+  // Secondary Fallback: Nominatim Details API
+  try {
+    const fallbackResponse = await axios.get('https://nominatim.openstreetmap.org/details', {
+      params: {
+        place_id: cleanId,
+        format: 'json'
+      },
+      headers: {
+        'User-Agent': 'GlobeTrotter-TravelApp/1.0'
+      },
+      timeout: 4000
+    });
+
+    if (fallbackResponse.data) {
+      return normalizePlaceDetails(fallbackResponse.data);
+    }
+  } catch (fallbackErr) {
+    console.warn(`[Nominatim Place Details Warning]: ${fallbackErr.message}`);
+  }
+
+  return null;
+}
+
 module.exports = {
-  searchActivities
+  searchActivities,
+  getPlaceDetails
 };

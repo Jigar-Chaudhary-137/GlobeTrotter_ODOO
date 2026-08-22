@@ -9,6 +9,7 @@ const {
   getDestinationsHandler,
   getActivitiesHandler,
   getRecommendationsHandler,
+  getPlaceDetailsHandler,
   searchCities,
   searchActivities
 } = require('../controllers/exploreController');
@@ -19,8 +20,10 @@ router.get('/cities', getDestinationsHandler || searchCities);
 // Points of Interest & Activity Search
 router.get('/activities', getActivitiesHandler || searchActivities);
 
-// Simple Recommendations
+// Categorized Recommendations
 router.get('/recommendations', getRecommendationsHandler);
 
-module.exports = router;
+// Place / Activity Details API
+router.get('/place/:id', getPlaceDetailsHandler);
 
+module.exports = router;

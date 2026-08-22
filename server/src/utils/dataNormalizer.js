@@ -135,6 +135,72 @@ function normalizeActivity(item, refLat, refLng) {
 }
 
 /**
+ * Normalizes place details from Geoapify Place Details API or Nominatim Details API.
+ * @param {Object} item 
+ * @returns {Object} Clean normalized place details object
+ */
+function normalizePlaceDetails(item) {
+  if (!item) return null;
+
+  const properties = item.properties || item;
+  const name = properties.name || properties.title || (properties.display_name ? properties.display_name.split(',')[0] : 'Popular Place');
+
+  const lat = Number(properties.lat || properties.latitude || item.lat);
+  const lng = Number(properties.lon || properties.longitude || item.lon);
+
+  // Extract category
+  let categoryRaw = 'attractions';
+  if (properties.categories && Array.isArray(properties.categories)) {
+    categoryRaw = properties.categories.join(' ');
+  } else if (properties.category) {
+    categoryRaw = String(properties.category);
+  } else if (properties.type) {
+    categoryRaw = String(properties.type);
+  }
+  const category = normalizeCategoryString(categoryRaw);
+
+  const address = properties.address_line2 || properties.formatted || properties.display_name || properties.address?.formatted || '';
+  const city = properties.city || properties.address?.city || properties.address?.town || null;
+  const country = properties.country || properties.address?.country || null;
+  const placeId = properties.place_id || properties.osm_id || item.place_id || `place_${Math.random().toString(36).substring(2, 9)}`;
+
+  // Optional contact / metadata
+  const website = properties.website || properties.contact?.website || properties.url || null;
+  const phone = properties.phone || properties.contact?.phone || null;
+  const openingHours = properties.opening_hours || properties.opening_hours_raw || properties.datasource?.raw?.opening_hours || null;
+
+  // Price category
+  let priceCategory = '$';
+  if (category === 'outdoors') priceCategory = 'Free';
+  else if (category === 'dining' || category === 'shopping') priceCategory = '$$';
+
+  if (properties.price_level !== undefined) {
+    if (properties.price_level === 0) priceCategory = 'Free';
+    else if (properties.price_level === 1) priceCategory = '$';
+    else if (properties.price_level === 2) priceCategory = '$$';
+    else if (properties.price_level >= 3) priceCategory = '$$$';
+  }
+
+  return {
+    id: String(placeId),
+    name: String(name).trim(),
+    category: category,
+    address: String(address).trim(),
+    city: city ? String(city).trim() : null,
+    country: country ? String(country).trim() : null,
+    lat: isNaN(lat) ? 0 : lat,
+    lng: isNaN(lng) ? 0 : lng,
+    description: properties.description || `${name}${city ? ` in ${city}` : ''}`,
+    rating: properties.rank?.popularity ? Math.min(5, Math.max(3.5, Number((properties.rank.popularity * 5).toFixed(1)))) : 4.5,
+    priceCategory: priceCategory,
+    website: website ? String(website).trim() : null,
+    phone: phone ? String(phone).trim() : null,
+    openingHours: openingHours ? String(openingHours).trim() : null,
+    distanceKm: properties.distanceKm !== undefined ? Number(properties.distanceKm) : 0
+  };
+}
+
+/**
  * Normalizes Open-Meteo weather response.
  * @param {Object} weatherData 
  * @param {string} cityName 
@@ -210,5 +276,6 @@ module.exports = {
   normalizeCategoryString,
   normalizeDestination,
   normalizeActivity,
+  normalizePlaceDetails,
   normalizeWeather
 };
