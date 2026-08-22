@@ -566,15 +566,30 @@ export default function TripBuilder() {
 
   // CALCULATE EXPENSE SUMS
   const getExpensesSum = () => {
-    if (!trip) return { total: 0, itineraryTotal: 0, generalTotal: 0 };
+    if (!trip) return { total: 0, itineraryTotal: 0, generalTotal: 0, sectionsTotal: 0 };
 
-    const itineraryTotal = (trip.itinerary || []).reduce((sum, item) => sum + (item.cost || 0), 0);
-    const generalTotal = (trip.expenses || []).reduce((sum, exp) => sum + (exp.amount || 0), 0);
+    const items = trip.itinerary || trip.itineraryItems || [];
+    const itineraryTotal = items.reduce((sum, item) => {
+      const val = item?.cost !== undefined && item?.cost !== null ? Number(item.cost) : (item?.expense !== undefined && item?.expense !== null ? Number(item.expense) : 0);
+      return sum + (isNaN(val) || !isFinite(val) ? 0 : val);
+    }, 0);
+
+    const generalTotal = (trip.expenses || []).reduce((sum, exp) => {
+      const a = exp && exp.amount !== undefined && exp.amount !== null ? Number(exp.amount) : 0;
+      return sum + (isNaN(a) || !isFinite(a) ? 0 : a);
+    }, 0);
+
+    const activeSections = (sections && sections.length > 0) ? sections : (trip.sections || []);
+    const sectionsTotal = activeSections.reduce((sum, sec) => {
+      const b = sec && sec.budget !== undefined && sec.budget !== null ? Number(sec.budget) : 0;
+      return sum + (isNaN(b) || !isFinite(b) ? 0 : b);
+    }, 0);
 
     return {
-      total: itineraryTotal + generalTotal,
+      total: itineraryTotal + generalTotal + sectionsTotal,
       itineraryTotal,
-      generalTotal
+      generalTotal,
+      sectionsTotal
     };
   };
 
@@ -589,23 +604,55 @@ export default function TripBuilder() {
     CATEGORIES.forEach(cat => { groups[cat] = 0; });
 
     // Itinerary items mapping
-    (trip.itinerary || []).forEach(item => {
-      const cat = item.category === 'Culture/Museums' || item.category === 'Attractions' ? 'Activities' :
-                 item.category === 'Food/Restaurants' ? 'Meals' : item.category;
+    const items = trip.itinerary || trip.itineraryItems || [];
+    items.forEach(item => {
+      const rawCat = item.category ? item.category.toUpperCase() : '';
+      const cat = rawCat === 'CULTURE/MUSEUMS' || rawCat === 'ATTRACTIONS' || rawCat === 'ACTIVITIES' ? 'Activities' :
+                 rawCat === 'FOOD/RESTAURANTS' || rawCat === 'MEALS' ? 'Meals' :
+                 rawCat === 'TRANSPORT' ? 'Transport' :
+                 rawCat === 'ACCOMMODATION' ? 'Accommodation' : 'Other';
+      const val = item?.cost !== undefined && item?.cost !== null ? Number(item.cost) : (item?.expense !== undefined && item?.expense !== null ? Number(item.expense) : 0);
+      const costVal = isNaN(val) || !isFinite(val) ? 0 : val;
       if (groups[cat] !== undefined) {
-        groups[cat] += (item.cost || 0);
+        groups[cat] += costVal;
       } else {
-        groups['Other'] += (item.cost || 0);
+        groups['Other'] += costVal;
       }
     });
 
     // General expenses mapping
     (trip.expenses || []).forEach(exp => {
       const cat = exp.category;
+      const a = exp && exp.amount !== undefined && exp.amount !== null ? Number(exp.amount) : 0;
+      const amtVal = isNaN(a) || !isFinite(a) ? 0 : a;
       if (groups[cat] !== undefined) {
-        groups[cat] += (exp.amount || 0);
+        groups[cat] += amtVal;
       } else {
-        groups['Other'] += (exp.amount || 0);
+        groups['Other'] += amtVal;
+      }
+    });
+
+    // Itinerary sections budget mapping
+    const activeSections = (sections && sections.length > 0) ? sections : (trip.sections || []);
+    activeSections.forEach(sec => {
+      const b = sec && sec.budget !== undefined && sec.budget !== null ? Number(sec.budget) : 0;
+      const budgetVal = isNaN(b) || !isFinite(b) ? 0 : b;
+      if (budgetVal <= 0) return;
+
+      const titleLower = (sec.title || '').toLowerCase();
+      let cat = 'Activities';
+      if (titleLower.includes('dining') || titleLower.includes('food') || titleLower.includes('culinary') || titleLower.includes('meal')) {
+        cat = 'Meals';
+      } else if (titleLower.includes('hotel') || titleLower.includes('stay') || titleLower.includes('accommodation')) {
+        cat = 'Accommodation';
+      } else if (titleLower.includes('transport') || titleLower.includes('flight') || titleLower.includes('transit')) {
+        cat = 'Transport';
+      }
+
+      if (groups[cat] !== undefined) {
+        groups[cat] += budgetVal;
+      } else {
+        groups['Other'] += budgetVal;
       }
     });
 
