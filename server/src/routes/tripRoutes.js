@@ -27,7 +27,7 @@ router.use(authenticate);
 router.get('/', getTrips);
 router.post('/', validateTripInput, createTrip);
 router.get('/:id', getTripById);
-router.put('/:id', validateTripInput, updateTrip);
+router.put('/:id', updateTrip);
 router.delete('/:id', deleteTrip);
 router.post('/:id/publish', publishTrip);
 

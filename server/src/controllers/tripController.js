@@ -73,7 +73,20 @@ const getTripById = async (req, res, next) => {
       return errorResponse(res, 403, 'Access denied to private trip');
     }
 
-    return successResponse(res, 200, 'Trip details retrieved', trip);
+    let parsedSections = [];
+    if (trip.description) {
+      try {
+        const parsed = JSON.parse(trip.description);
+        if (Array.isArray(parsed)) parsedSections = parsed;
+      } catch (e) {
+        // Text description
+      }
+    }
+
+    return successResponse(res, 200, 'Trip details retrieved', {
+      ...trip,
+      sections: parsedSections,
+    });
   } catch (error) {
     next(error);
   }
@@ -164,20 +177,28 @@ const createTrip = async (req, res, next) => {
 const updateTrip = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { ownershipError, code } = await checkTripOwnership(id, req.user.id);
+    const { error: ownershipError, code } = await checkTripOwnership(id, req.user.id);
     if (ownershipError) return errorResponse(res, code, ownershipError);
 
-    const { title, description, coverImage, startDate, endDate, totalBudget, status, isPublic } = req.body;
+    const { title, name, description, sections, coverImage, startDate, endDate, totalBudget, budget, status, isPublic } = req.body;
+
+    const tripTitle = title || name;
+    const budgetVal = totalBudget !== undefined ? totalBudget : budget;
+
+    let descVal = description;
+    if (sections !== undefined && Array.isArray(sections)) {
+      descVal = JSON.stringify(sections);
+    }
 
     const updatedTrip = await prisma.trip.update({
       where: { id },
       data: {
-        ...(title && { title: title.trim() }),
-        ...(description !== undefined && { description }),
+        ...(tripTitle && { title: tripTitle.trim() }),
+        ...(descVal !== undefined && { description: descVal }),
         ...(coverImage !== undefined && { coverImage }),
         ...(startDate !== undefined && { startDate: startDate ? new Date(startDate) : null }),
         ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
-        ...(totalBudget !== undefined && { totalBudget: parseFloat(totalBudget) }),
+        ...(budgetVal !== undefined && { totalBudget: parseFloat(budgetVal) }),
         ...(status && { status }),
         ...(isPublic !== undefined && { isPublic: Boolean(isPublic) }),
       },
@@ -188,7 +209,20 @@ const updateTrip = async (req, res, next) => {
       },
     });
 
-    return successResponse(res, 200, 'Trip updated successfully', updatedTrip);
+    let parsedSections = [];
+    if (updatedTrip.description) {
+      try {
+        const parsed = JSON.parse(updatedTrip.description);
+        if (Array.isArray(parsed)) parsedSections = parsed;
+      } catch (e) {
+        // Text description
+      }
+    }
+
+    return successResponse(res, 200, 'Trip updated successfully', {
+      ...updatedTrip,
+      sections: parsedSections,
+    });
   } catch (error) {
     next(error);
   }
@@ -198,7 +232,7 @@ const updateTrip = async (req, res, next) => {
 const deleteTrip = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { ownershipError, code } = await checkTripOwnership(id, req.user.id);
+    const { error: ownershipError, code } = await checkTripOwnership(id, req.user.id);
     if (ownershipError) return errorResponse(res, code, ownershipError);
 
     await prisma.trip.delete({
