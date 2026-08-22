@@ -6,6 +6,40 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding GlobeTrotter database...');
 
+  // ── Demo accounts for hackathon evaluators ────────────────────────────────
+  const demoUserPassword = await bcrypt.hash('Demo@123', 10);
+  await prisma.user.upsert({
+    where: { email: 'demo@globetrotter.com' },
+    update: {},
+    create: {
+      name: 'Demo User',
+      email: 'demo@globetrotter.com',
+      password: demoUserPassword,
+      city: 'New York',
+      country: 'USA',
+      bio: 'A demo traveller account for evaluating GlobeTrotter.',
+      role: 'USER',
+    },
+  });
+  console.log('Demo user seeded: demo@globetrotter.com');
+
+  const demoAdminPassword = await bcrypt.hash('Admin@123', 10);
+  await prisma.user.upsert({
+    where: { email: 'admin@globetrotter.com' },
+    update: {},
+    create: {
+      name: 'Demo Admin',
+      email: 'admin@globetrotter.com',
+      password: demoAdminPassword,
+      city: 'San Francisco',
+      country: 'USA',
+      bio: 'A demo admin account for evaluating GlobeTrotter.',
+      role: 'ADMIN',
+    },
+  });
+  console.log('Demo admin seeded: admin@globetrotter.com');
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Create demo user
   const hashedPassword = await bcrypt.hash('password123', 10);
   const user = await prisma.user.upsert({

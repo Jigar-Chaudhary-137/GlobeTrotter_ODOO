@@ -179,6 +179,60 @@ export default function Login() {
             </div>
           </form>
 
+          {/* Demo Accounts */}
+          <div className="mt-5">
+            <div className="relative flex items-center gap-3 mb-3">
+              <div className="flex-1 h-px bg-stone-200/80" />
+              <span className="text-xs font-semibold text-text-muted uppercase tracking-widest whitespace-nowrap">
+                Demo Accounts
+              </span>
+              <div className="flex-1 h-px bg-stone-200/80" />
+            </div>
+            <p className="text-xs text-text-muted text-center mb-3">
+              Click a card to fill credentials instantly
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Demo User */}
+              <button
+                type="button"
+                id="demo-user-btn"
+                onClick={() => {
+                  setUsername('demo@globetrotter.com');
+                  setPassword('Demo@123');
+                  setFormErrors({});
+                  setApiError('');
+                }}
+                className="group flex flex-col items-start p-3 rounded-xl border border-stone-200 bg-bg-warm hover:border-primary/40 hover:bg-primary/5 transition-all text-left"
+              >
+                <span className="flex items-center gap-1.5 mb-0.5">
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-[10px] font-bold">U</span>
+                  <span className="text-xs font-semibold text-text-dark group-hover:text-primary transition-colors">Demo User</span>
+                </span>
+                <span className="text-[10px] text-text-muted font-mono leading-tight">demo@globetrotter.com</span>
+                <span className="text-[10px] text-text-muted font-mono">Demo@123</span>
+              </button>
+              {/* Demo Admin */}
+              <button
+                type="button"
+                id="demo-admin-btn"
+                onClick={() => {
+                  setUsername('admin@globetrotter.com');
+                  setPassword('Admin@123');
+                  setFormErrors({});
+                  setApiError('');
+                }}
+                className="group flex flex-col items-start p-3 rounded-xl border border-stone-200 bg-bg-warm hover:border-primary/40 hover:bg-primary/5 transition-all text-left"
+              >
+                <span className="flex items-center gap-1.5 mb-0.5">
+                  <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-[10px] font-bold">A</span>
+                  <span className="text-xs font-semibold text-text-dark group-hover:text-primary transition-colors">Demo Admin</span>
+                </span>
+                <span className="text-[10px] text-text-muted font-mono leading-tight">admin@globetrotter.com</span>
+                <span className="text-[10px] text-text-muted font-mono">Admin@123</span>
+              </button>
+            </div>
+          </div>
+
           {/* Navigation to Register */}
           <div className="mt-6 border-t border-stone-200/80 pt-6 text-center">
             <p className="text-sm text-text-muted font-sans">
