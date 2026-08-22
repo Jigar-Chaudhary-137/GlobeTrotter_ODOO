@@ -1,5 +1,5 @@
 /**
- * Travel Calculation Utilities for GlobeTrotter
+ * Travel Calculation Utilities & Handoff Validation for GlobeTrotter
  * Member 3 Responsibility
  */
 
@@ -91,8 +91,52 @@ function sortActivitiesByDistance(activities, refLat, refLng) {
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
+/**
+ * Helper utility to validate if a destination object meets the minimum handoff contract.
+ * @param {Object} dest 
+ * @returns {boolean} True if destination object is valid for Trip Builder handoff
+ */
+function isValidDestinationHandoff(dest) {
+  if (!dest || typeof dest !== 'object') return false;
+  const lat = Number(dest.lat);
+  const lng = Number(dest.lng);
+  return (
+    typeof dest.name === 'string' &&
+    dest.name.trim().length > 0 &&
+    !isNaN(lat) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    !isNaN(lng) &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
+
+/**
+ * Helper utility to validate if an activity object meets the minimum handoff contract.
+ * @param {Object} activity 
+ * @returns {boolean} True if activity object is valid for Trip Builder handoff
+ */
+function isValidActivityHandoff(activity) {
+  if (!activity || typeof activity !== 'object') return false;
+  const lat = Number(activity.lat);
+  const lng = Number(activity.lng);
+  return (
+    typeof activity.name === 'string' &&
+    activity.name.trim().length > 0 &&
+    !isNaN(lat) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    !isNaN(lng) &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
+
 module.exports = {
   calculateHaversineDistance,
   formatCoordinates,
-  sortActivitiesByDistance
+  sortActivitiesByDistance,
+  isValidDestinationHandoff,
+  isValidActivityHandoff
 };

@@ -217,6 +217,84 @@ GET /api/weather?city=London
 
 ---
 
+## 🔁 Trip Builder Data Handoff
+
+This section outlines how Member 1 (Frontend) passes selected destination and activity objects to Member 2 (Trip Backend) for trip and itinerary creation.
+
+### Data Flow Pipeline
+```text
+[ Explore Page ]
+       │
+       ▼ (User selects a city from /api/explore/cities)
+[ Normalized Destination Object ]
+       │
+       ▼ (Passed to Trip Builder state)
+[ Trip Builder ]
+       │
+       ▼ (User picks activities from /api/explore/activities)
+[ Normalized Activity Objects ]
+       │
+       ▼ (Submitted to Member 2 Trip API)
+[ Member 2 PostgreSQL Database ]
+```
+
+### 1. Destination Handoff Payload (Explore ➔ Trip Builder)
+When a user selects a destination from `/api/explore/cities`, the complete normalized object is:
+```json
+{
+  "id": "97644102",
+  "name": "Paris",
+  "state": "Île-de-France",
+  "country": "France",
+  "formattedName": "Paris, Île-de-France, France",
+  "lat": 48.8534951,
+  "lng": 2.3483915,
+  "bbox": { "lon1": 2.224122, "lat1": 48.8155755, "lon2": 2.4697602, "lat2": 48.902156 },
+  "timezone": "Europe/Paris"
+}
+```
+
+### 2. Activity Handoff Payload (Explore ➔ Trip Builder)
+When a user adds an activity from `/api/explore/activities`, the complete normalized object is:
+```json
+{
+  "id": "97283443",
+  "name": "Point zéro des Routes de France",
+  "category": "attractions",
+  "address": "Point zéro des Routes de France, Parvis Notre-Dame, Paris",
+  "lat": 48.8534015,
+  "lng": 2.3487885,
+  "description": "Point zéro des Routes de France in destination",
+  "rating": 4.5,
+  "priceCategory": "$",
+  "distanceKm": 0.03
+}
+```
+
+### 3. Field Classification Matrix
+
+| Field | Source Type | Safe to Persist in DB | Required / Optional | Usage |
+| :--- | :--- | :--- | :--- | :--- |
+| `id` | External API Place ID | ✅ Yes (String reference) | Required | Unique place key |
+| `name` | Normalized String | ✅ Yes | Required | City or Activity name |
+| `country` | Normalized String | ✅ Yes | Required for Destinations | Country context |
+| `lat` | Float Number | ✅ Yes | Required | Geographic Latitude |
+| `lng` | Float Number | ✅ Yes | Required | Geographic Longitude |
+| `category` | Normalized String | ✅ Yes | Required for Activities | Activity grouping |
+| `address` | Normalized String | ✅ Yes | Optional | Full street address |
+| `state` | Normalized String | ⚠️ Optional | Optional | Region/State name |
+| `description` | Normalized String | ⚠️ Optional | Optional | Activity summary |
+| `rating` | Float Number | 💡 UI only | Optional | Display rating |
+| `priceCategory` | Enum String | 💡 UI only | Optional | Price tier badge |
+| `distanceKm` | Float Number | 💡 UI only | Optional | Distance from city center |
+
+### 4. Optional Backend Handoff Validation Utilities
+Member 3 provides helper functions in `server/src/utils/travelUtils.js` for quick validation before persistence:
+* `isValidDestinationHandoff(dest)`: Returns `true` if `name`, `lat`, and `lng` are non-empty and within valid ranges.
+* `isValidActivityHandoff(activity)`: Returns `true` if `name`, `lat`, and `lng` are non-empty and within valid ranges.
+
+---
+
 ## ⚠️ Error Responses
 
 | Status | Cause | Response Structure |
