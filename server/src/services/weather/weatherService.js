@@ -10,13 +10,13 @@ const { searchDestinations } = require('../travel/destinationService');
 
 /**
  * Fetches current weather and 7-day forecast for a city or coordinates.
- * Non-blocking: returns clean fallback object on error without throwing.
+ * Non-blocking: returns null on error without throwing or returning fake data.
  * 
  * @param {Object} params
  * @param {string} [params.city] City name
  * @param {number} [params.lat] Latitude
  * @param {number} [params.lng] Longitude
- * @returns {Promise<Object>} Normalized weather data
+ * @returns {Promise<Object|null>} Normalized weather data or null on failure
  */
 async function getWeatherForecast({ city, lat, lng }) {
   let targetLat = Number(lat);
@@ -27,7 +27,7 @@ async function getWeatherForecast({ city, lat, lng }) {
   if ((isNaN(targetLat) || isNaN(targetLng) || (targetLat === 0 && targetLng === 0)) && city) {
     try {
       const destinations = await searchDestinations(city, 1);
-      if (destinations.length > 0) {
+      if (destinations && destinations.length > 0) {
         targetLat = destinations[0].lat;
         targetLng = destinations[0].lng;
         cityName = destinations[0].name;
@@ -37,9 +37,9 @@ async function getWeatherForecast({ city, lat, lng }) {
     }
   }
 
-  // If coordinates still unresolvable, return clean empty weather object
+  // If coordinates still unresolvable, return null
   if (isNaN(targetLat) || isNaN(targetLng) || (targetLat === 0 && targetLng === 0)) {
-    return normalizeWeather(null, cityName, 0, 0);
+    return null;
   }
 
   try {
@@ -51,13 +51,13 @@ async function getWeatherForecast({ city, lat, lng }) {
         daily: 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode',
         timezone: 'auto'
       },
-      timeout: 4000 // Fast 4-second timeout to ensure non-blocking performance
+      timeout: 4000
     });
 
     return normalizeWeather(response.data, cityName, targetLat, targetLng);
   } catch (err) {
-    console.warn(`[Weather Service Warning]: Open-Meteo request failed (${err.message}). Returning fallback weather structure.`);
-    return normalizeWeather(null, cityName, targetLat, targetLng);
+    console.warn(`[Weather Service Warning]: Open-Meteo request failed (${err.message}).`);
+    return null;
   }
 }
 

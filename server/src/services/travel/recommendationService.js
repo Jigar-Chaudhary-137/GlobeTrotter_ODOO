@@ -1,6 +1,7 @@
 /**
  * Simple Recommendation Service for GlobeTrotter
- * Priority 5 Implementation — Member 3
+ * Member 3 Responsibility
+ * Generates recommendations strictly from dynamic travel activity data
  */
 
 const { searchActivities } = require('./activityService');
@@ -8,7 +9,7 @@ const { searchDestinations } = require('./destinationService');
 
 /**
  * Returns simple categorized recommendations for a destination.
- * Categorizes results into Attractions, Culture, Dining, and Outdoors.
+ * Categorizes live activity results into Attractions, Culture, Dining, and Outdoors.
  * 
  * @param {Object} params
  * @param {string} params.city Destination city
@@ -38,7 +39,7 @@ async function getRecommendedPlaces({ city, lat, lng }) {
   if ((isNaN(destLat) || isNaN(destLng) || destLat === 0) && city) {
     try {
       const destinations = await searchDestinations(city, 1);
-      if (destinations.length > 0) {
+      if (destinations && destinations.length > 0) {
         destLat = destinations[0].lat;
         destLng = destinations[0].lng;
         cityName = destinations[0].name;
@@ -48,7 +49,7 @@ async function getRecommendedPlaces({ city, lat, lng }) {
     }
   }
 
-  // Fetch activities using the user's city search term
+  // Fetch activities dynamically from live API
   const allActivities = await searchActivities({
     city: cityName,
     lat: destLat,
@@ -57,32 +58,35 @@ async function getRecommendedPlaces({ city, lat, lng }) {
     limit: 30
   });
 
-  // Group by categories
+  if (!Array.isArray(allActivities)) {
+    return {
+      city: cityName,
+      coordinates: { lat: destLat || 0, lng: destLng || 0 },
+      totalFound: 0,
+      recommendations: {
+        attractions: [],
+        culture: [],
+        dining: [],
+        outdoors: []
+      }
+    };
+  }
+
+  // Group live retrieved activities into categories
   const attractions = allActivities.filter(a => a.category === 'attractions' || a.category === 'entertainment').slice(0, 5);
   const culture = allActivities.filter(a => a.category === 'culture').slice(0, 5);
   const dining = allActivities.filter(a => a.category === 'dining').slice(0, 5);
   const outdoors = allActivities.filter(a => a.category === 'outdoors').slice(0, 5);
-
-  // Distribute remaining items if specific categories are sparse
-  const assigned = new Set([...attractions, ...culture, ...dining, ...outdoors]);
-  const unassigned = allActivities.filter(a => !assigned.has(a));
-
-  if (attractions.length < 3 && unassigned.length > 0) {
-    attractions.push(...unassigned.splice(0, 3 - attractions.length));
-  }
-  if (culture.length < 2 && unassigned.length > 0) {
-    culture.push(...unassigned.splice(0, 2 - culture.length));
-  }
 
   return {
     city: cityName,
     coordinates: { lat: destLat || 0, lng: destLng || 0 },
     totalFound: allActivities.length,
     recommendations: {
-      attractions: attractions,
-      culture: culture,
-      dining: dining,
-      outdoors: outdoors
+      attractions,
+      culture,
+      dining,
+      outdoors
     }
   };
 }

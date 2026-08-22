@@ -26,12 +26,23 @@ async function getWeatherHandler(req, res, next) {
       lng: lng ? parseFloat(lng) : undefined
     });
 
+    if (!weatherData) {
+      return res.status(503).json({
+        success: false,
+        message: 'Weather data is temporarily unavailable'
+      });
+    }
+
     return res.status(200).json({
       success: true,
       data: weatherData
     });
   } catch (error) {
-    next(error);
+    console.error('[Weather Controller Error]:', error.message);
+    return res.status(503).json({
+      success: false,
+      message: 'Weather data is temporarily unavailable'
+    });
   }
 }
 
