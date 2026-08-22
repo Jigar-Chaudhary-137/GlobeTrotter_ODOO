@@ -214,16 +214,33 @@ GlobeTrotter relies **100% on real-time, dynamic external data** rather than sta
 
 ---
 
+## 📚 Repository Documentation Index
+
+Comprehensive documentation is available in the [`docs/`](./docs) folder:
+
+- 🏗️ **[System Architecture](docs/ARCHITECTURE.md)**: High-level client-server diagram, execution flows, and security design.
+- 🗄️ **[Database Architecture](docs/DATABASE.md)**: PostgreSQL schema, Prisma models, entity relationships, and indexes.
+- 🛠️ **[Developer Setup & Guide](docs/DEVELOPMENT.md)**: Local installation, environment configuration, and execution commands.
+- 🎬 **[Hackathon Judge Demo Guide](docs/DEMO_GUIDE.md)**: Step-by-step 2-minute presentation walkthrough and talking points.
+- 📡 **[API Contracts & Dictionary](server/API_CONTRACTS.md)**: Member 3 API specifications, request payloads, and field dictionary.
+
+---
+
 ## 📁 High-Level Project Structure
 
 ```text
 GlobeTrotter_ODOO/
 │
+├── docs/                       # Project Architecture & Hackathon Guides
+│   ├── ARCHITECTURE.md         # System Architecture & Flow Diagrams
+│   ├── DATABASE.md             # Prisma Schema & PostgreSQL Specifications
+│   ├── DEVELOPMENT.md          # Local Setup & Execution Guide
+│   └── DEMO_GUIDE.md           # Hackathon Judge Walkthrough & Talking Points
+│
 ├── client/                     # React + Vite Frontend Application
 │   └── src/
 │       ├── components/         # Reusable UI & Layout components
-│       ├── context/            # Global State (Auth, Context)
-│       ├── features/           # Feature modules (trips, explore, budget)
+│       ├── context/            # Global State (Auth Context, Toast)
 │       ├── pages/              # Route views (Login, Register, Dashboard)
 │       └── services/           # Frontend API integration services
 │
@@ -241,7 +258,7 @@ GlobeTrotter_ODOO/
 │
 ├── .env.example                # Environment Template File
 ├── .gitignore                  # Git Exclusion Definitions
-├── README.md                   # Project Documentation
+├── README.md                   # Project Documentation Index
 └── package.json                # Monorepo NPM Scripts & Dependencies
 ```
 
