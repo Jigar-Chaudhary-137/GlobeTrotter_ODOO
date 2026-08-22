@@ -1,0 +1,24 @@
+{
+  "name": "globetrotter",
+  "version": "1.0.0",
+  "description": "GlobeTrotter - Travel Planning Application",
+  "main": "server/src/server.js",
+  "scripts": {
+    "client": "npm --prefix client run dev",
+    "server": "npm --prefix server run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "install:all": "npm install && npm --prefix client install && npm --prefix server install"
+  },
+  "keywords": [
+    "globetrotter",
+    "travel",
+    "react",
+    "express",
+    "prisma"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
