@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { tripService } from '../services/tripService';
-import { communityService } from '../services/communityService';
+import { adminService } from '../services/adminService';
 import { 
   Users, 
   MapPin, 
@@ -43,9 +42,14 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState('users'); // users, cities, activities, analytics
   const [loading, setLoading] = useState(true);
   
-  // Data lists
-  const [trips, setTrips] = useState([]);
-  const [publicTrips, setPublicTrips] = useState([]);
+  // Real DB Data lists & Stats
+  const [adminData, setAdminData] = useState({
+    stats: { totalUsers: 0, totalTrips: 0, publicTrips: 0, privateTrips: 0, totalStops: 0, totalItineraryItems: 0, totalExpenses: 0 },
+    users: [],
+    trips: [],
+    popularDestinations: [],
+    popularActivities: []
+  });
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,23 +68,17 @@ export default function Admin() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const tripsPromise = tripService.getTrips();
-        const communityPromise = communityService.getPublicTrips();
-
-        const [tripsData, communityData] = await Promise.all([
-          tripsPromise.catch(() => []),
-          communityPromise.catch(() => [])
-        ]);
-
-        const unwrappedPublic = Array.isArray(communityData) 
-          ? communityData 
-          : (communityData.data || communityData.trips || []);
-
-        setTrips(tripsData);
-        setPublicTrips(unwrappedPublic);
+        const data = await adminService.getAdminStats();
+        setAdminData({
+          stats: data.stats || { totalUsers: 0, totalTrips: 0, publicTrips: 0, privateTrips: 0, totalStops: 0, totalItineraryItems: 0, totalExpenses: 0 },
+          users: data.users || [],
+          trips: data.trips || [],
+          popularDestinations: data.popularDestinations || [],
+          popularActivities: data.popularActivities || []
+        });
       } catch (err) {
-        console.error("Failed to load admin stats:", err);
-        addToast("Error fetching platform metrics. Using fallbacks.", "warning");
+        console.error("Failed to load admin stats from server:", err);
+        addToast("Error fetching platform metrics from server.", "error");
       } finally {
         setLoading(false);
       }
@@ -89,82 +87,45 @@ export default function Admin() {
     fetchData();
   }, [addToast]);
 
-  // DERIVE MANAGE USERS LIST
+  // DERIVE MANAGE USERS LIST FROM REAL DB USERS
   const derivedUsers = React.useMemo(() => {
-    const userMap = {};
-    
-    // Add public trips authors
-    publicTrips.forEach(t => {
-      if (t.user && t.user.id) {
-        userMap[t.user.id] = {
-          ...t.user,
-          tripsCount: (userMap[t.user.id]?.tripsCount || 0) + 1,
-          createdAt: t.user.createdAt || new Date().toISOString()
-        };
-      }
-    });
+    return adminData.users.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      city: u.city || 'Home City',
+      country: u.country || 'Home Country',
+      profilePic: u.profilePic || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80',
+      tripsCount: u._count?.trips || 0,
+      createdAt: u.createdAt || new Date().toISOString()
+    }));
+  }, [adminData.users]);
 
-    // Add current user
-    if (user) {
-      userMap[user.id] = {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        city: user.city || 'Home City',
-        country: user.country || 'Home Country',
-        profilePic: user.avatar || user.profilePic || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80',
-        tripsCount: (userMap[user.id]?.tripsCount || 0) + trips.length,
-        createdAt: user.createdAt || new Date().toISOString()
-      };
-    }
-
-    return Object.values(userMap);
-  }, [publicTrips, trips, user]);
-
-  // DERIVE POPULAR CITIES
+  // DERIVE POPULAR CITIES FROM REAL DB DESTINATIONS
   const derivedCities = React.useMemo(() => {
-    const cityMap = {};
-    [...trips, ...publicTrips].forEach(t => {
-      t.stops?.forEach(s => {
-        if (s.city) {
-          const key = `${s.city}, ${s.country}`;
-          cityMap[key] = (cityMap[key] || 0) + 1;
-        }
-      });
-    });
-    return Object.entries(cityMap)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [trips, publicTrips]);
+    return adminData.popularDestinations.map(d => ({
+      name: d.name || `${d.city}, ${d.country}`,
+      count: d.count || 0
+    }));
+  }, [adminData.popularDestinations]);
 
-  // DERIVE POPULAR ACTIVITIES
+  // DERIVE POPULAR ACTIVITIES FROM REAL DB ACTIVITIES
   const derivedActivities = React.useMemo(() => {
-    const actMap = {};
-    [...trips, ...publicTrips].forEach(t => {
-      // Look inside mapped itineraries
-      t.itinerary?.forEach(item => {
-        const title = item.activityName || item.title;
-        if (title) {
-          actMap[title] = {
-            count: (actMap[title]?.count || 0) + 1,
-            cost: item.cost || item.expense || 0,
-            category: item.category || 'Activities'
-          };
-        }
-      });
-    });
-    return Object.entries(actMap)
-      .map(([name, details]) => ({ name, ...details }))
-      .sort((a, b) => b.count - a.count);
-  }, [trips, publicTrips]);
+    return adminData.popularActivities.map(a => ({
+      name: a.name,
+      category: a.category || 'Activities',
+      cost: a.cost || 0,
+      count: a.count || 0
+    }));
+  }, [adminData.popularActivities]);
 
-  // DERIVE ANALYTICS DATA
+  // DERIVE ANALYTICS DATA FROM REAL DB TRIPS & STOPS
   const analyticsData = React.useMemo(() => {
-    const all = [...trips, ...publicTrips];
+    const allTrips = adminData.trips;
     
     // Country Pie Chart
     const countryCounts = {};
-    all.forEach(t => {
+    allTrips.forEach(t => {
       t.stops?.forEach(s => {
         if (s.country) {
           countryCounts[s.country] = (countryCounts[s.country] || 0) + 1;
@@ -173,11 +134,11 @@ export default function Admin() {
     });
     const pieData = Object.entries(countryCounts)
       .map(([name, value]) => ({ name, value }))
-      .slice(0, 5); // top 5 countries
+      .slice(0, 5);
 
     // Line Chart (month trends)
     const monthCounts = {};
-    all.forEach(t => {
+    allTrips.forEach(t => {
       if (t.startDate) {
         const d = new Date(t.startDate);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -189,16 +150,16 @@ export default function Admin() {
       .map(([name, value]) => ({ name, value }));
 
     // Bar Chart (budget comparisons)
-    const barData = all
-      .filter(t => t.budget)
+    const barData = allTrips
+      .filter(t => t.totalBudget || t.budget)
       .map(t => ({
-        name: (t.name || 'Trip').substring(0, 10),
-        budget: t.budget || 0
+        name: (t.title || t.name || 'Trip').substring(0, 10),
+        budget: t.totalBudget || t.budget || 0
       }))
       .slice(0, 6);
 
     return { pieData, lineData, barData };
-  }, [trips, publicTrips]);
+  }, [adminData.trips]);
 
   // Search & Filter lists
   const filteredUsers = derivedUsers.filter(u => {
@@ -417,17 +378,21 @@ export default function Admin() {
             </div>
 
             {/* Statistics counter panel */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="border border-stone-200 p-4 rounded-xl">
                 <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Total Platform Trips</span>
-                <span className="block text-2xl font-extrabold text-stone-850 mt-1">{trips.length + publicTrips.length}</span>
+                <span className="block text-2xl font-extrabold text-stone-850 mt-1">{adminData.stats.totalTrips}</span>
               </div>
               <div className="border border-stone-200 p-4 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Indexed Users</span>
-                <span className="block text-2xl font-extrabold text-stone-850 mt-1">{derivedUsers.length}</span>
+                <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Registered Users</span>
+                <span className="block text-2xl font-extrabold text-stone-850 mt-1">{adminData.stats.totalUsers}</span>
               </div>
               <div className="border border-stone-200 p-4 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Platform Cities visited</span>
+                <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Public Trips</span>
+                <span className="block text-2xl font-extrabold text-stone-850 mt-1">{adminData.stats.publicTrips}</span>
+              </div>
+              <div className="border border-stone-200 p-4 rounded-xl">
+                <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider">Cities Visited</span>
                 <span className="block text-2xl font-extrabold text-stone-850 mt-1">{derivedCities.length}</span>
               </div>
             </div>

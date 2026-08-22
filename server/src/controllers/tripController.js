@@ -82,28 +82,79 @@ const getTripById = async (req, res, next) => {
 // POST /api/trips
 const createTrip = async (req, res, next) => {
   try {
-    const { title, description, coverImage, startDate, endDate, totalBudget, status, isPublic } = req.body;
+    const { title, name, description, coverImage, startDate, endDate, totalBudget, budget, status, isPublic, stops, itinerary, itineraryItems } = req.body;
+
+    const tripTitle = (title || name || '').trim() || 'Untitled Trip';
+    const budgetVal = totalBudget !== undefined ? parseFloat(totalBudget) : (budget !== undefined ? parseFloat(budget) : 0);
 
     const trip = await prisma.trip.create({
       data: {
         userId: req.user.id,
-        title: title.trim(),
+        title: tripTitle,
         description: description || null,
         coverImage: coverImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=80',
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
-        totalBudget: totalBudget ? parseFloat(totalBudget) : 0,
+        totalBudget: isNaN(budgetVal) ? 0 : budgetVal,
         status: status || 'PLANNED',
         isPublic: Boolean(isPublic),
+        stops: Array.isArray(stops) && stops.length > 0 ? {
+          create: stops.map((s, idx) => ({
+            city: (s.city || '').trim(),
+            country: (s.country || '').trim(),
+            arrivalDate: s.arrivalDate ? new Date(s.arrivalDate) : null,
+            departureDate: s.departureDate ? new Date(s.departureDate) : null,
+            order: s.order !== undefined ? parseInt(s.order) : idx + 1,
+            notes: s.notes || null,
+          }))
+        } : undefined,
       },
       include: {
-        stops: true,
+        stops: { orderBy: { order: 'asc' } },
         itineraryItems: true,
         expenses: true,
       },
     });
 
-    return successResponse(res, 201, 'Trip created successfully', trip);
+    // If initial itinerary items were provided (e.g. from CreateTrip suggestions)
+    const initialItems = itinerary || itineraryItems;
+    if (Array.isArray(initialItems) && initialItems.length > 0) {
+      const firstStopId = trip.stops[0]?.id || null;
+      for (const item of initialItems) {
+        let cat = 'ACTIVITIES';
+        if (item.category) {
+          const uCat = item.category.toUpperCase();
+          if (['TRANSPORT', 'ACCOMMODATION', 'ACTIVITIES', 'MEALS', 'OTHER'].includes(uCat)) cat = uCat;
+        }
+
+        await prisma.itineraryItem.create({
+          data: {
+            tripId: trip.id,
+            tripStopId: firstStopId,
+            dayNumber: item.dayNumber ? parseInt(item.dayNumber) : 1,
+            date: item.date ? new Date(item.date) : (trip.startDate || new Date()),
+            time: item.time || '09:00',
+            title: (item.title || item.activityName || 'Activity').trim(),
+            description: item.description || item.notes || null,
+            category: cat,
+            expense: item.expense !== undefined ? parseFloat(item.expense) : (item.cost !== undefined ? parseFloat(item.cost) : 0),
+            location: item.location || null,
+          },
+        });
+      }
+    }
+
+    // Refetch complete trip with newly created itinerary items
+    const completeTrip = await prisma.trip.findUnique({
+      where: { id: trip.id },
+      include: {
+        stops: { orderBy: { order: 'asc' } },
+        itineraryItems: { orderBy: [{ dayNumber: 'asc' }, { time: 'asc' }] },
+        expenses: true,
+      },
+    });
+
+    return successResponse(res, 201, 'Trip created successfully', completeTrip);
   } catch (error) {
     next(error);
   }
@@ -271,19 +322,31 @@ const addItineraryItem = async (req, res, next) => {
     const { error: ownershipError, code } = await checkTripOwnership(tripId, req.user.id);
     if (ownershipError) return errorResponse(res, code, ownershipError);
 
-    const { tripStopId, dayNumber, date, time, title, description, category, expense, location } = req.body;
+    const { stopId, tripStopId, dayNumber, date, time, title, activityName, description, notes, category, expense, cost, location } = req.body;
+
+    const itemTitle = (title || activityName || '').trim() || 'New Activity';
+    const expenseVal = expense !== undefined ? parseFloat(expense) : (cost !== undefined ? parseFloat(cost) : 0);
+    const descVal = description || notes || null;
+
+    let catEnum = 'ACTIVITIES';
+    if (category) {
+      const uCat = category.toUpperCase();
+      if (['TRANSPORT', 'ACCOMMODATION', 'ACTIVITIES', 'MEALS', 'OTHER'].includes(uCat)) {
+        catEnum = uCat;
+      }
+    }
 
     const item = await prisma.itineraryItem.create({
       data: {
         tripId,
-        tripStopId: tripStopId || null,
+        tripStopId: tripStopId || stopId || null,
         dayNumber: dayNumber ? parseInt(dayNumber) : 1,
         date: date ? new Date(date) : null,
         time: time || '09:00',
-        title: title.trim(),
-        description: description || null,
-        category: category || 'ACTIVITIES',
-        expense: expense ? parseFloat(expense) : 0,
+        title: itemTitle,
+        description: descVal,
+        category: catEnum,
+        expense: isNaN(expenseVal) ? 0 : expenseVal,
         location: location || null,
       },
     });
@@ -301,19 +364,31 @@ const updateItineraryItem = async (req, res, next) => {
     const { error: ownershipError, code } = await checkTripOwnership(tripId, req.user.id);
     if (ownershipError) return errorResponse(res, code, ownershipError);
 
-    const { tripStopId, dayNumber, date, time, title, description, category, expense, location } = req.body;
+    const { stopId, tripStopId, dayNumber, date, time, title, activityName, description, notes, category, expense, cost, location } = req.body;
+
+    const itemTitle = title || activityName;
+    const descVal = description !== undefined ? description : notes;
+    const expenseVal = expense !== undefined ? parseFloat(expense) : (cost !== undefined ? parseFloat(cost) : undefined);
+
+    let catEnum = undefined;
+    if (category) {
+      const uCat = category.toUpperCase();
+      if (['TRANSPORT', 'ACCOMMODATION', 'ACTIVITIES', 'MEALS', 'OTHER'].includes(uCat)) {
+        catEnum = uCat;
+      }
+    }
 
     const updatedItem = await prisma.itineraryItem.update({
       where: { id: itemId },
       data: {
-        ...(tripStopId !== undefined && { tripStopId: tripStopId || null }),
+        ...((tripStopId !== undefined || stopId !== undefined) && { tripStopId: tripStopId || stopId || null }),
         ...(dayNumber !== undefined && { dayNumber: parseInt(dayNumber) }),
         ...(date !== undefined && { date: date ? new Date(date) : null }),
         ...(time !== undefined && { time }),
-        ...(title && { title: title.trim() }),
-        ...(description !== undefined && { description }),
-        ...(category && { category }),
-        ...(expense !== undefined && { expense: parseFloat(expense) }),
+        ...(itemTitle && { title: itemTitle.trim() }),
+        ...(descVal !== undefined && { description: descVal }),
+        ...(catEnum && { category: catEnum }),
+        ...(expenseVal !== undefined && !isNaN(expenseVal) && { expense: expenseVal }),
         ...(location !== undefined && { location }),
       },
     });
@@ -425,18 +500,27 @@ const addExpense = async (req, res, next) => {
     const { error: ownershipError, code } = await checkTripOwnership(tripId, req.user.id);
     if (ownershipError) return errorResponse(res, code, ownershipError);
 
-    const { category, amount, description, date, currency } = req.body;
+    const { category, amount, description, notes, date, currency } = req.body;
 
-    if (!category || !amount || !description) {
+    const descVal = description || notes;
+    if (!category || amount === undefined || !descVal) {
       return errorResponse(res, 400, 'Category, amount, and description are required');
+    }
+
+    let catEnum = 'OTHER';
+    if (category) {
+      const uCat = category.toUpperCase();
+      if (['TRANSPORT', 'ACCOMMODATION', 'ACTIVITIES', 'MEALS', 'OTHER'].includes(uCat)) {
+        catEnum = uCat;
+      }
     }
 
     const expense = await prisma.expense.create({
       data: {
         tripId,
-        category,
+        category: catEnum,
         amount: parseFloat(amount),
-        description: description.trim(),
+        description: descVal.trim(),
         currency: currency || 'USD',
         date: date ? new Date(date) : new Date(),
       },

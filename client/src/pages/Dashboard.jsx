@@ -33,32 +33,24 @@ export default function Dashboard() {
       try {
         if (isDemoMode) {
           const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-          const all = [...demoTrips, ...MOCK_TRIPS];
-          const unique = all.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-          setTrips(unique);
+          setTrips(demoTrips);
           setLoading(false);
           return;
         }
 
         const data = await tripService.getTrips();
-        setTrips(data);
+        setTrips(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Failed to load trips from API:", err);
         setError("Could not load trips from server.");
-        // Fallback to local storage demo trips
-        const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-        const all = [...demoTrips, ...MOCK_TRIPS];
-        const unique = all.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-        setTrips(unique);
-        addToast("Server connection offline. Displaying cached sessions.", "warning");
-        setError(null);
+        setTrips([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchTrips();
-  }, [isDemoMode, addToast]);
+  }, [isDemoMode]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

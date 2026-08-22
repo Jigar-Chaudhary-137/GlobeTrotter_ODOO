@@ -51,34 +51,13 @@ export default function MainLanding() {
         if (isDemoMode) {
           loadedTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
         } else {
-          try {
-            const data = await tripService.getTrips();
-            loadedTrips = data.trips || data;
-          } catch (e) {
-            console.warn("API failed to fetch trips, falling back to local storage:", e);
-            loadedTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-          }
+          const data = await tripService.getTrips();
+          loadedTrips = Array.isArray(data) ? data : (data.trips || []);
         }
-
-        // Combine loaded trips with mock trips to ensure we have at least 3 previous trips to display
-        const combined = [...loadedTrips, ...MOCK_TRIPS];
-        
-        // Add a third mock trip if still under 3 to satisfy the wireframe layout
-        if (combined.length < 3) {
-          combined.push({
-            id: 'trip-3',
-            name: 'Weekend Getaway in Rome',
-            startDate: '2026-10-12',
-            endDate: '2026-10-15',
-            budget: 950,
-            stops: [{ city: 'Rome', country: 'Italy', durationDays: 3, order: 0 }],
-            isPublic: false
-          });
-        }
-        
-        setTrips(combined.slice(0, 3)); // show exactly 3 previous trips as in the wireframe
+        setTrips(loadedTrips);
       } catch (err) {
-        console.error("Failed to load trips", err);
+        console.error("Failed to load trips from API", err);
+        setTrips([]);
       }
     };
 
@@ -352,57 +331,63 @@ export default function MainLanding() {
         </h2>
 
         {/* 3 columns grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {trips.map(trip => (
-            <div 
-              key={trip.id}
-              onClick={() => handleTripCardClick(trip.id)}
-              className="bg-white border border-stone-200/80 rounded-2xl p-5 shadow-xs hover:shadow-md hover:border-stone-300 transition-all cursor-pointer group flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex justify-between items-start gap-2">
-                  <h3 className="font-bold text-stone-900 text-sm leading-snug group-hover:text-primary transition-colors">
-                    {trip.name}
-                  </h3>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 uppercase tracking-wider ${
-                    trip.isPublic 
-                      ? 'bg-emerald-100 text-emerald-800' 
-                      : 'bg-stone-100 text-stone-600'
-                  }`}>
-                    {trip.isPublic ? 'Public' : 'Private'}
-                  </span>
-                </div>
-
-                <div className="mt-3.5 space-y-2">
-                  {/* Date range */}
-                  <div className="flex items-center gap-2 text-xs text-stone-600 font-medium">
-                    <Calendar className="w-4 h-4 text-stone-400 shrink-0" />
-                    <span>{trip.startDate} to {trip.endDate}</span>
-                  </div>
-
-                  {/* Budget */}
-                  <div className="flex items-center gap-2 text-xs text-stone-600 font-medium">
-                    <Wallet className="w-4 h-4 text-stone-400 shrink-0" />
-                    <span>Budget: ${trip.budget.toLocaleString()}</span>
-                  </div>
-
-                  {/* Stops */}
-                  <div className="flex items-start gap-2 text-xs text-stone-600 font-medium">
-                    <MapPin className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
-                    <span className="line-clamp-2">
-                      Stops: {trip.stops?.map(s => s.city).join(' → ') || 'No stops mapped'}
+        {trips.length === 0 ? (
+          <div className="bg-white border border-stone-200 border-dashed p-8 rounded-3xl text-center space-y-2">
+            <p className="text-text-muted text-xs font-semibold">No trips created yet. Click "Plan a Trip" below to build your first itinerary!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {trips.map(trip => (
+              <div 
+                key={trip.id}
+                onClick={() => handleTripCardClick(trip.id)}
+                className="bg-white border border-stone-200/80 rounded-2xl p-5 shadow-xs hover:shadow-md hover:border-stone-300 transition-all cursor-pointer group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex justify-between items-start gap-2">
+                    <h3 className="font-bold text-stone-900 text-sm leading-snug group-hover:text-primary transition-colors">
+                      {trip.name}
+                    </h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 uppercase tracking-wider ${
+                      trip.isPublic 
+                        ? 'bg-emerald-100 text-emerald-800' 
+                        : 'bg-stone-100 text-stone-600'
+                    }`}>
+                      {trip.isPublic ? 'Public' : 'Private'}
                     </span>
                   </div>
+
+                  <div className="mt-3.5 space-y-2">
+                    {/* Date range */}
+                    <div className="flex items-center gap-2 text-xs text-stone-600 font-medium">
+                      <Calendar className="w-4 h-4 text-stone-400 shrink-0" />
+                      <span>{trip.startDate} to {trip.endDate}</span>
+                    </div>
+
+                    {/* Budget */}
+                    <div className="flex items-center gap-2 text-xs text-stone-600 font-medium">
+                      <Wallet className="w-4 h-4 text-stone-400 shrink-0" />
+                      <span>Budget: ${(trip.budget || 0).toLocaleString()}</span>
+                    </div>
+
+                    {/* Stops */}
+                    <div className="flex items-start gap-2 text-xs text-stone-600 font-medium">
+                      <MapPin className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
+                      <span className="line-clamp-2">
+                        Stops: {trip.stops?.map(s => s.city).join(' → ') || 'No stops mapped'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 pt-4 border-t border-stone-100 flex items-center justify-between text-xs text-primary font-bold">
+                  <span>View Itinerary</span>
+                  <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
-
-              <div className="mt-5 pt-4 border-t border-stone-100 flex items-center justify-between text-xs text-primary font-bold">
-                <span>View Itinerary</span>
-                <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 5. Plan a Trip Button */}

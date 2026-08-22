@@ -87,17 +87,26 @@ export default function CreateTrip() {
     setIsSubmitting(true);
     try {
       const payload = {
+        title: `Trip to ${selectedPlace}`,
         name: `Trip to ${selectedPlace}`,
         startDate,
         endDate,
-        budget: 1500,
-        stops: finalStops.map(s => ({
+        totalBudget: Number(budget || 1500),
+        budget: Number(budget || 1500),
+        stops: finalStops.map((s, idx) => ({
           city: s.city,
           country: s.country,
           arrivalDate: s.arrivalDate,
           departureDate: s.departureDate,
-          durationDays: s.durationDays,
-          order: s.order
+          order: s.order !== undefined ? s.order : idx + 1
+        })),
+        itineraryItems: initialItinerary.map(item => ({
+          title: item.activityName || item.title,
+          category: item.category,
+          expense: item.cost || item.expense || 0,
+          date: item.date,
+          time: item.time,
+          notes: item.notes
         }))
       };
 
@@ -105,9 +114,10 @@ export default function CreateTrip() {
         const mockNewTrip = {
           id: `trip-new-${Date.now()}`,
           name: `Trip to ${selectedPlace}`,
+          title: `Trip to ${selectedPlace}`,
           startDate,
           endDate,
-          budget: 1500,
+          budget: Number(budget || 1500),
           isPublic: false,
           stops: finalStops,
           itinerary: initialItinerary,
@@ -120,27 +130,15 @@ export default function CreateTrip() {
         navigate(`/trips/${mockNewTrip.id}`);
       } else {
         const response = await tripService.createTrip(payload);
+        const createdId = response.trip?.id || response.id || response.data?.id;
+        if (!createdId) throw new Error('Server returned invalid trip record.');
         addToast('Trip created successfully!', 'success');
-        navigate(`/trips/${response.trip?.id || response.id}`);
+        navigate(`/trips/${createdId}`);
       }
     } catch (err) {
-      console.warn("Trip creation API failed, executing demo fallback:", err);
-      const mockNewTrip = {
-        id: `trip-new-${Date.now()}`,
-        name: `Trip to ${selectedPlace}`,
-        startDate,
-        endDate,
-        budget: 1500,
-        isPublic: false,
-        stops: finalStops,
-        itinerary: initialItinerary,
-        expenses: []
-      };
-      const savedDemoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-      localStorage.setItem('demo_trips', JSON.stringify([...savedDemoTrips, mockNewTrip]));
-
-      addToast('Trip created successfully (Offline Fallback)!', 'success');
-      navigate(`/trips/${mockNewTrip.id}`);
+      console.error("Trip creation API error:", err);
+      const msg = err.response?.data?.message || err.message || 'Failed to create trip. Please try again.';
+      addToast(msg, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -176,11 +174,11 @@ export default function CreateTrip() {
   };
 
   const handleAddStop = () => {
-    // Left intact for compatibility with unused components
+    // Left intact for compatibility
   };
 
   const handleRemoveStop = (id) => {
-    // Left intact for compatibility with unused components
+    // Left intact for compatibility
   };
 
   const handleSubmitTrip = async () => {
@@ -192,25 +190,26 @@ export default function CreateTrip() {
     setIsSubmitting(true);
     try {
       const payload = {
+        title: tripName,
         name: tripName,
         startDate,
         endDate,
+        totalBudget: Number(budget),
         budget: Number(budget),
-        stops: stops.map(s => ({
+        stops: stops.map((s, idx) => ({
           city: s.city,
           country: s.country,
           arrivalDate: s.arrivalDate,
           departureDate: s.departureDate,
-          durationDays: s.durationDays,
-          order: s.order
+          order: s.order !== undefined ? s.order : idx + 1
         }))
       };
 
       if (isDemoMode) {
-        // Create mock trip item in local storage/context simulation
         const mockNewTrip = {
           id: `trip-new-${Date.now()}`,
           name: tripName,
+          title: tripName,
           startDate,
           endDate,
           budget: Number(budget),
@@ -219,7 +218,6 @@ export default function CreateTrip() {
           itinerary: [],
           expenses: []
         };
-        // Save to cache for builder page to pull
         const savedDemoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
         localStorage.setItem('demo_trips', JSON.stringify([...savedDemoTrips, mockNewTrip]));
 
@@ -227,28 +225,15 @@ export default function CreateTrip() {
         navigate(`/trips/${mockNewTrip.id}`);
       } else {
         const response = await tripService.createTrip(payload);
+        const createdId = response.trip?.id || response.id || response.data?.id;
+        if (!createdId) throw new Error('Server returned invalid trip record.');
         addToast('Trip created successfully!', 'success');
-        navigate(`/trips/${response.trip?.id || response.id}`);
+        navigate(`/trips/${createdId}`);
       }
     } catch (err) {
-      console.warn("Trip creation API failed, executing demo session fallback:", err);
-      // Fallback
-      const mockNewTrip = {
-        id: `trip-new-${Date.now()}`,
-        name: tripName,
-        startDate,
-        endDate,
-        budget: Number(budget),
-        isPublic: false,
-        stops: stops,
-        itinerary: [],
-        expenses: []
-      };
-      const savedDemoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-      localStorage.setItem('demo_trips', JSON.stringify([...savedDemoTrips, mockNewTrip]));
-
-      addToast('Trip created successfully (Offline Demo Mode)!', 'success');
-      navigate(`/trips/${mockNewTrip.id}`);
+      console.error("Trip creation API error:", err);
+      const msg = err.response?.data?.message || err.message || 'Failed to create trip. Please try again.';
+      addToast(msg, 'error');
     } finally {
       setIsSubmitting(false);
     }

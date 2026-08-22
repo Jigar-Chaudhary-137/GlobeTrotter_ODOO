@@ -46,8 +46,17 @@ export const tripService = {
   },
 
   createTrip: async (tripData) => {
-    const response = await api.post('/trips', tripData);
-    return response.data;
+    const payload = {
+      ...tripData,
+      title: tripData.title || tripData.name,
+      totalBudget: tripData.totalBudget !== undefined ? tripData.totalBudget : tripData.budget,
+    };
+    const response = await api.post('/trips', payload);
+    const createdTrip = response.data?.data || response.data?.trip || response.data;
+    return {
+      ...response.data,
+      trip: mapTripResponse(createdTrip) || createdTrip,
+    };
   },
 
   updateTrip: async (id, tripData) => {

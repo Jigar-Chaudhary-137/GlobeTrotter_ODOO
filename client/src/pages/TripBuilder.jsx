@@ -158,15 +158,8 @@ export default function TripBuilder() {
         addToast('Itinerary sections saved successfully!', 'success');
       }
     } catch (err) {
-      console.warn("Failed to save sections to API, fallback to local save:", err);
-      const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-      const idx = demoTrips.findIndex(t => t.id === id);
-      if (idx !== -1) {
-        demoTrips[idx] = updatedTrip;
-        localStorage.setItem('demo_trips', JSON.stringify(demoTrips));
-      }
-      setTrip(updatedTrip);
-      addToast('Itinerary sections saved locally (Offline Fallback)!', 'success');
+      console.error("Failed to save sections to API:", err);
+      addToast('Failed to save itinerary sections. Please try again.', 'error');
     } finally {
       setSavingSections(false);
     }
@@ -176,7 +169,6 @@ export default function TripBuilder() {
   const fetchTripDetails = async () => {
     try {
       if (isDemoMode) {
-        // Look inside local storage for user created demo trips
         const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
         let found = demoTrips.find(t => t.id === id);
         if (!found) found = MOCK_TRIPS.find(t => t.id === id);
@@ -193,17 +185,8 @@ export default function TripBuilder() {
       const response = await tripService.getTripById(id);
       setTrip(response.trip || response);
     } catch (err) {
-      console.warn("Failed to fetch trip details from API, seeking local cache:", err);
-      // Fallback
-      const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-      let found = demoTrips.find(t => t.id === id);
-      if (!found) found = MOCK_TRIPS.find(t => t.id === id);
-
-      if (found) {
-        setTrip(found);
-      } else {
-        addToast("Unable to load trip. Back to dashboard.", "error");
-      }
+      console.error("Failed to fetch trip details from API:", err);
+      addToast("Unable to load trip details from server.", "error");
     } finally {
       setLoading(false);
     }
