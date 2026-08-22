@@ -13,17 +13,31 @@ async function getWeatherHandler(req, res, next) {
   try {
     const { city, lat, lng } = req.query;
 
-    if (!city && (!lat || !lng)) {
+    if (!city && lat === undefined && lng === undefined) {
       return res.status(400).json({
         success: false,
         message: 'Please provide either a city name or latitude/longitude coordinates for weather data.'
       });
     }
 
+    // Validate coordinates if provided
+    let parsedLat;
+    let parsedLng;
+    if (lat !== undefined || lng !== undefined) {
+      parsedLat = parseFloat(lat);
+      parsedLng = parseFloat(lng);
+      if (isNaN(parsedLat) || isNaN(parsedLng) || parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid latitude or longitude coordinates provided.'
+        });
+      }
+    }
+
     const weatherData = await getWeatherForecast({
-      city,
-      lat: lat ? parseFloat(lat) : undefined,
-      lng: lng ? parseFloat(lng) : undefined
+      city: city ? String(city).trim() : undefined,
+      lat: parsedLat,
+      lng: parsedLng
     });
 
     if (!weatherData) {

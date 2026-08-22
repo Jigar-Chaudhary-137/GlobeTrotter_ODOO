@@ -62,19 +62,33 @@ async function getActivitiesHandler(req, res, next) {
   try {
     const { city, lat, lng, category, limit } = req.query;
 
-    if (!city && (!lat || !lng)) {
+    if (!city && lat === undefined && lng === undefined) {
       return res.status(400).json({
         success: false,
         message: 'Please provide either a city name or latitude and longitude coordinates.'
       });
     }
 
+    // Validate coordinates if provided
+    let parsedLat;
+    let parsedLng;
+    if (lat !== undefined || lng !== undefined) {
+      parsedLat = parseFloat(lat);
+      parsedLng = parseFloat(lng);
+      if (isNaN(parsedLat) || isNaN(parsedLng) || parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid latitude or longitude coordinates provided.'
+        });
+      }
+    }
+
     // Dynamic search via primary Geoapify / secondary Nominatim live APIs
     const activities = await searchActivitiesService({
-      city,
-      lat: lat ? parseFloat(lat) : undefined,
-      lng: lng ? parseFloat(lng) : undefined,
-      category: category || 'all',
+      city: city ? String(city).trim() : undefined,
+      lat: parsedLat,
+      lng: parsedLng,
+      category: category ? String(category).trim() : 'all',
       limit: parseInt(limit, 10) || 20
     });
 
@@ -111,17 +125,31 @@ async function getRecommendationsHandler(req, res, next) {
   try {
     const { city, lat, lng } = req.query;
 
-    if (!city && (!lat || !lng)) {
+    if (!city && lat === undefined && lng === undefined) {
       return res.status(400).json({
         success: false,
         message: 'Please provide a city name or latitude and longitude for recommendations.'
       });
     }
 
+    // Validate coordinates if provided
+    let parsedLat;
+    let parsedLng;
+    if (lat !== undefined || lng !== undefined) {
+      parsedLat = parseFloat(lat);
+      parsedLng = parseFloat(lng);
+      if (isNaN(parsedLat) || isNaN(parsedLng) || parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid latitude or longitude coordinates provided.'
+        });
+      }
+    }
+
     const recommendations = await getRecommendedPlaces({
-      city,
-      lat: lat ? parseFloat(lat) : undefined,
-      lng: lng ? parseFloat(lng) : undefined
+      city: city ? String(city).trim() : undefined,
+      lat: parsedLat,
+      lng: parsedLng
     });
 
     if (!recommendations) {
