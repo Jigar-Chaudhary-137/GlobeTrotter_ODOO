@@ -8,7 +8,7 @@ GlobeTrotter is a full-stack, personalized travel planning platform designed to 
 
 ## 🎯 Problem Statement
 
-Travelers often struggle with fragmented tools when planning multi-city journeys—switching between mapping services, weather apps, spreadsheet budget trackers, and static blog posts. The hackathon challenge demands a unified, end-to-end travel planning application where users can:
+Travelers often struggle with fragmented tools when planning multi-city journeys—switching between mapping services, weather apps, spreadsheet budget trackers, and static blog posts. GlobeTrotter addresses this by providing a unified, end-to-end travel planning application where users can:
 
 - Build customized multi-city travel itineraries
 - Assign travel dates, day-wise activities, and estimated expenses
@@ -18,7 +18,7 @@ Travelers often struggle with fragmented tools when planning multi-city journeys
 - Share travel plans publicly via unique shareable links
 - Duplicate public itineraries directly into their personal account for customized travel
 
-All user-specific travel data—including trips, stops, itinerary items, expenses, and saved destinations—must be reliably persisted in a relational database.
+All user-specific travel data—including trips, stops, itinerary items, expenses, and saved destinations—is reliably persisted in a relational PostgreSQL database.
 
 ---
 
@@ -209,8 +209,8 @@ GlobeTrotter relies **100% on real-time, dynamic external data** rather than sta
 | :--- | :--- | :--- |
 | `GET` | `/api/public/trips/:shareId` | View read-only public trip |
 | `POST` | `/api/public/trips/:shareId/copy` | Clone public trip into user account |
-| `GET` | `/api/community/posts` | Fetch public community feed |
-| `POST` | `/api/community/trips/:tripId/like` | Like a public trip |
+| `GET` | `/api/community` | Fetch public community feed |
+| `POST` | `/api/community/:id/like` | Like a public trip |
 
 ---
 
@@ -221,8 +221,8 @@ Comprehensive documentation is available in the [`docs/`](./docs) folder:
 - 🏗️ **[System Architecture](docs/ARCHITECTURE.md)**: High-level client-server diagram, execution flows, and security design.
 - 🗄️ **[Database Architecture](docs/DATABASE.md)**: PostgreSQL schema, Prisma models, entity relationships, and indexes.
 - 🛠️ **[Developer Setup & Guide](docs/DEVELOPMENT.md)**: Local installation, environment configuration, and execution commands.
-- 🎬 **[Hackathon Judge Demo Guide](docs/DEMO_GUIDE.md)**: Step-by-step 2-minute presentation walkthrough and talking points.
-- 📡 **[API Contracts & Dictionary](server/API_CONTRACTS.md)**: Member 3 API specifications, request payloads, and field dictionary.
+- 🎬 **[Application Demo Guide](docs/DEMO_GUIDE.md)**: Step-by-step application walkthrough and feature points.
+- 📡 **[API Contracts & Dictionary](server/API_CONTRACTS.md)**: API specifications, request payloads, and field dictionary.
 
 ---
 
@@ -231,11 +231,11 @@ Comprehensive documentation is available in the [`docs/`](./docs) folder:
 ```text
 GlobeTrotter_ODOO/
 │
-├── docs/                       # Project Architecture & Hackathon Guides
+├── docs/                       # Project Architecture & Application Guides
 │   ├── ARCHITECTURE.md         # System Architecture & Flow Diagrams
 │   ├── DATABASE.md             # Prisma Schema & PostgreSQL Specifications
 │   ├── DEVELOPMENT.md          # Local Setup & Execution Guide
-│   └── DEMO_GUIDE.md           # Hackathon Judge Walkthrough & Talking Points
+│   └── DEMO_GUIDE.md           # Application Walkthrough & Feature Points
 │
 ├── client/                     # React + Vite Frontend Application
 │   └── src/
@@ -245,7 +245,7 @@ GlobeTrotter_ODOO/
 │       └── services/           # Frontend API integration services
 │
 ├── server/                     # Express.js REST API Server
-│   ├── API_CONTRACTS.md        # Detailed Member 3 API Documentation
+│   ├── API_CONTRACTS.md        # Detailed Travel & Weather API Documentation
 │   ├── prisma/
 │   │   └── schema.prisma       # PostgreSQL Prisma ORM Schema
 │   └── src/
@@ -320,41 +320,3 @@ npm run dev
 ### Start Individual Services
 - **Backend Server Only**: `npm run server`
 - **Frontend Client Only**: `npm run client`
-
----
-
-## 🎬 Hackathon Demo Flow
-
-Follow this flow for the ideal application demonstration:
-
-1. **User Authentication**: Register a new user account or log in.
-2. **Dashboard Overview**: View your personalized travel dashboard.
-3. **Explore Destinations**: Search for a destination (e.g., `Paris`) to view live geocoding data.
-4. **Discover Activities**: Filter attractions, museums, or dining options with distance indicators.
-5. **Check Weather**: View current temperature and the 7-day daily weather forecast.
-6. **Create Multi-City Trip**: Initialize a new trip with start/end dates and target budget.
-7. **Add Trip Stops**: Add city stops (e.g., `Paris`, `London`) to build your route.
-8. **Organize Day-Wise Itinerary**: Assign activities to specific day numbers and time slots.
-9. **Log Budget Expenses**: Add expense entries and view visual cost breakdowns.
-10. **Publish & Share**: Toggle public trip sharing to generate a public share link (`shareId`).
-11. **Copy Trip**: Access a shared trip link as a secondary user and click **Copy Trip** to clone it into your account.
-
----
-
-## 👥 Team Responsibilities
-
-- **Member 1 — Frontend Development**: React UI components, page layouts, Tailwind styling, state management, and frontend API consumption.
-- **Member 2 — Backend & Database**: Express REST API architecture, PostgreSQL database schema, Prisma ORM setup, authentication, and core Trip/Itinerary CRUD.
-- **Member 3 — Travel Data & External APIs**: Geoapify Geocoding & Places integration, Open-Meteo weather integration, API response normalization, travel calculations, and API documentation.
-- **Member 4 — Integration & QA**: Community public sharing, Copy Trip functionality, end-to-end integration testing, QA validation, and deployment.
-
----
-
-## 🌟 Hackathon Highlights
-
-- **Relational PostgreSQL Architecture**: Normalized schema supporting multi-city itineraries and expense logging.
-- **100% Dynamic External Data**: Zero static JSON fallbacks for destination, activity, or weather discovery.
-- **Multi-City Itinerary Planning**: Flexible order-based stop creation with day-wise agenda organization.
-- **Interactive Budget Visualization**: Category breakdown charts with `Recharts`.
-- **Public Itinerary Sharing & Cloning**: One-click trip duplication for community travel inspiration.
-- **Clean API Contract Design**: Strictly normalized JSON contracts documented in `server/API_CONTRACTS.md`.
