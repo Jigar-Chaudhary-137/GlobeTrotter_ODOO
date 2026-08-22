@@ -15,6 +15,7 @@ import TripBuilder from '../pages/TripBuilder';
 import Community from '../pages/Community';
 import PublicTrip from '../pages/PublicTrip';
 import Profile from '../pages/Profile';
+import Calendar from '../pages/Calendar';
 
 // Protected Route Guard
 const PrivateRoute = ({ children }) => {
@@ -124,6 +125,14 @@ const AppRoutes = () => {
         element={
           <PrivateRoute>
             <Dashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/calendar"
+        element={
+          <PrivateRoute>
+            <Calendar />
           </PrivateRoute>
         }
       />

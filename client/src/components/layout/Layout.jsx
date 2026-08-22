@@ -10,7 +10,8 @@ import {
   Menu, 
   X, 
   PlaneTakeoff,
-  Plus
+  Plus,
+  Calendar
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -22,6 +23,7 @@ const Layout = ({ children }) => {
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: Map },
     { name: 'My Trips', path: '/trips', icon: PlaneTakeoff },
+    { name: 'Calendar', path: '/calendar', icon: Calendar },
     { name: 'Explore', path: '/explore', icon: Compass },
     { name: 'Community', path: '/community', icon: Users },
     { name: 'Profile', path: '/profile', icon: User },
