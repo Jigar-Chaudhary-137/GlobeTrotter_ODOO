@@ -153,8 +153,12 @@ export default function TripBuilder() {
         setTrip(updatedTrip);
         addToast('Itinerary sections saved (Demo Mode)!', 'success');
       } else {
-        await tripService.updateTrip(id, { sections });
-        setTrip(updatedTrip);
+        const res = await tripService.updateTrip(id, { sections });
+        const updatedTripData = res.data?.data || res.data?.trip || res.trip || res;
+        setTrip(updatedTripData);
+        if (updatedTripData.sections) {
+          setSections(updatedTripData.sections);
+        }
         addToast('Itinerary sections saved successfully!', 'success');
       }
     } catch (err) {
