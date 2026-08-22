@@ -119,6 +119,14 @@ const AppRoutes = () => {
           </PrivateRoute>
         } 
       />
+      <Route
+        path="/trips"
+        element={
+          <PrivateRoute>
+            <Dashboard />
+          </PrivateRoute>
+        }
+      />
 
       {/* Redirects */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

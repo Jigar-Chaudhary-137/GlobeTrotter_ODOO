@@ -21,6 +21,7 @@ const Layout = ({ children }) => {
 
   const menuItems = [
     { name: 'Dashboard', path: '/dashboard', icon: Map },
+    { name: 'My Trips', path: '/trips', icon: PlaneTakeoff },
     { name: 'Explore', path: '/explore', icon: Compass },
     { name: 'Community', path: '/community', icon: Users },
     { name: 'Profile', path: '/profile', icon: User },

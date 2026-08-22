@@ -1,15 +1,48 @@
 import api from './api';
 
+const mapItineraryItem = (item) => {
+  if (!item) return null;
+  return {
+    id: item.id,
+    stopId: item.tripStopId,
+    dayNumber: item.dayNumber,
+    date: item.date ? (typeof item.date === 'string' ? item.date.substring(0, 10) : new Date(item.date).toISOString().substring(0, 10)) : null,
+    time: item.time,
+    activityName: item.title,
+    category: item.category ? (item.category.charAt(0).toUpperCase() + item.category.slice(1).toLowerCase()) : 'Activities',
+    cost: item.expense,
+    notes: item.description,
+    location: item.location
+  };
+};
+
+const mapTripResponse = (trip) => {
+  if (!trip) return null;
+  return {
+    ...trip,
+    name: trip.name || trip.title,
+    budget: trip.budget || trip.totalBudget,
+    itinerary: trip.itinerary || (trip.itineraryItems ? trip.itineraryItems.map(mapItineraryItem) : []),
+    stops: trip.stops ? trip.stops.map(s => ({
+      ...s,
+      arrivalDate: s.arrivalDate ? s.arrivalDate.substring(0, 10) : '',
+      departureDate: s.departureDate ? s.departureDate.substring(0, 10) : ''
+    })) : []
+  };
+};
+
 export const tripService = {
   // Trip CRUDS
   getTrips: async () => {
     const response = await api.get('/trips');
-    return response.data;
+    const trips = response.data?.data || response.data || [];
+    return trips.map(mapTripResponse);
   },
 
   getTripById: async (id) => {
     const response = await api.get(`/trips/${id}`);
-    return response.data;
+    const trip = response.data?.data || response.data || response;
+    return mapTripResponse(trip);
   },
 
   createTrip: async (tripData) => {
