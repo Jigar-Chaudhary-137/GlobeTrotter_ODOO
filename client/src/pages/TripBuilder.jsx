@@ -41,6 +41,42 @@ import Modal from '../components/ui/Modal';
 const CATEGORIES = ['Transport', 'Accommodation', 'Activities', 'Meals', 'Other'];
 const COLORS = ['#0d9488', '#f97316', '#3b82f6', '#ec4899', '#8b5cf6'];
 
+const normalizeDate = (dateStr) => {
+  if (!dateStr) return '';
+  let str = typeof dateStr === 'string' ? dateStr : '';
+  if (dateStr instanceof Date) {
+    const yyyy = dateStr.getFullYear();
+    const mm = String(dateStr.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateStr.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  const cleanStr = str.split('T')[0].trim().replace(/\//g, '-');
+  if (/^\d{2}-\d{2}-\d{4}$/.test(cleanStr)) {
+    const [dd, mm, yyyy] = cleanStr.split('-');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
+    return cleanStr;
+  }
+  try {
+    const d = new Date(cleanStr);
+    if (!isNaN(d.getTime())) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  } catch (e) {}
+  return cleanStr;
+};
+
+const parseLocalDate = (dateStr) => {
+  const norm = normalizeDate(dateStr);
+  if (!norm || !/^\d{4}-\d{2}-\d{2}$/.test(norm)) return null;
+  const [yyyy, mm, dd] = norm.split('-').map(Number);
+  return new Date(yyyy, mm - 1, dd);
+};
+
 export default function TripBuilder() {
   const { id } = useParams();
   const { addToast } = useToast();
@@ -154,10 +190,17 @@ export default function TripBuilder() {
         addToast('Itinerary sections saved (Demo Mode)!', 'success');
       } else {
         const res = await tripService.updateTrip(id, { sections });
-        const updatedTripData = res.data?.data || res.data?.trip || res.trip || res;
+        const rawTrip = res.data || res.trip || res;
+        const updatedTripData = {
+          ...trip,
+          ...rawTrip,
+          name: rawTrip.title || rawTrip.name || trip.name,
+          budget: rawTrip.totalBudget !== undefined ? rawTrip.totalBudget : (rawTrip.budget !== undefined ? rawTrip.budget : trip.budget),
+          sections: rawTrip.sections || sections,
+        };
         setTrip(updatedTripData);
-        if (updatedTripData.sections) {
-          setSections(updatedTripData.sections);
+        if (rawTrip.sections) {
+          setSections(rawTrip.sections);
         }
         addToast('Itinerary sections saved successfully!', 'success');
       }
@@ -203,26 +246,70 @@ export default function TripBuilder() {
   // Generate days array between trip bounds
   const getTripDays = () => {
     if (!trip) return [];
-    const start = new Date(trip.startDate);
-    const end = new Date(trip.endDate);
-    const days = [];
-    let current = new Date(start);
 
-    while (current <= end) {
-      const dateString = current.toISOString().split('T')[0];
-      // Find which city stop covers this date
+    let startD = parseLocalDate(trip.startDate);
+    let endD = parseLocalDate(trip.endDate);
+
+    const activeSections = (sections && sections.length > 0) ? sections : (trip.sections || []);
+
+    if (!startD || !endD) {
+      const allDates = [];
+      if (trip.stops) {
+        trip.stops.forEach(s => {
+          if (s.arrivalDate) allDates.push(parseLocalDate(s.arrivalDate));
+          if (s.departureDate) allDates.push(parseLocalDate(s.departureDate));
+        });
+      }
+      if (activeSections) {
+        activeSections.forEach(sec => {
+          if (sec.startDate) allDates.push(parseLocalDate(sec.startDate));
+          if (sec.endDate) allDates.push(parseLocalDate(sec.endDate));
+        });
+      }
+      if (trip.itinerary) {
+        trip.itinerary.forEach(item => {
+          if (item.date) allDates.push(parseLocalDate(item.date));
+        });
+      }
+      const validDates = allDates.filter(Boolean);
+      if (validDates.length > 0) {
+        const timestamps = validDates.map(d => d.getTime());
+        if (!startD) startD = new Date(Math.min(...timestamps));
+        if (!endD) endD = new Date(Math.max(...timestamps));
+      }
+    }
+
+    if (!startD || !endD) {
+      const today = new Date();
+      startD = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      endD = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    }
+
+    const days = [];
+    let current = new Date(startD);
+    let dayNum = 1;
+
+    while (current <= endD) {
+      const yyyy = current.getFullYear();
+      const mm = String(current.getMonth() + 1).padStart(2, '0');
+      const dd = String(current.getDate()).padStart(2, '0');
+      const dateString = `${yyyy}-${mm}-${dd}`;
+
       const activeStop = trip.stops?.find(s => {
-        const stopStart = new Date(s.arrivalDate);
-        const stopEnd = new Date(s.departureDate);
-        return current >= stopStart && current <= stopEnd;
+        const sArr = parseLocalDate(s.arrivalDate);
+        const sDep = parseLocalDate(s.departureDate);
+        return sArr && sDep && current >= sArr && current <= sDep;
       });
 
       days.push({
+        dayNumber: dayNum,
         date: dateString,
         label: current.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
         stop: activeStop || null
       });
+
       current.setDate(current.getDate() + 1);
+      dayNum++;
     }
     return days;
   };
@@ -910,41 +997,151 @@ export default function TripBuilder() {
       {/* VIEW: TIMELINE / CALENDAR */}
       {activeTab === 'timeline' && (
         <div className="bg-white border border-stone-200 p-6 md:p-8 rounded-3xl space-y-8">
-          <h2 className="font-display font-bold text-lg text-text-dark">Journey Timeline</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="font-display font-bold text-lg text-text-dark">Journey Timeline & Schedule</h2>
+              <p className="text-xs text-text-muted mt-0.5">Chronological view of itinerary sections and scheduled activities</p>
+            </div>
+          </div>
 
-          <div className="relative border-l-2 border-primary/20 pl-6 ml-4 space-y-8 py-2">
-            {trip.stops?.map((stop, sIdx) => {
-              // Find activities mapped under this stop's date bounds
-              const stopStart = new Date(stop.arrivalDate);
-              const stopEnd = new Date(stop.departureDate);
-              const stopActivitiesCount = (trip.itinerary || []).filter(item => {
-                const itemDate = new Date(item.date);
-                return itemDate >= stopStart && itemDate <= stopEnd;
-              }).length;
+          {tripDays.length === 0 ? (
+            <div className="text-center py-12 text-stone-500 text-xs italic">
+              No timeline dates available. Please check trip start and end dates.
+            </div>
+          ) : (
+            <div className="relative border-l-2 border-primary/20 pl-6 ml-4 space-y-10 py-2">
+              {tripDays.map((day) => {
+                // Find activities for this day
+                const dayActivities = (trip.itinerary || []).filter(item => {
+                  const itemNorm = normalizeDate(item.date);
+                  return itemNorm === day.date || (!itemNorm && item.dayNumber === day.dayNumber);
+                }).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
-              return (
-                <div key={stop.id || sIdx} className="relative group">
-                  {/* Timeline dot */}
-                  <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-primary border-4 border-white shadow-xs group-hover:scale-110 transition-transform" />
+                // Find sections for this day
+                const currentSections = (sections.length > 0 ? sections : (trip.sections || []));
+                const daySections = currentSections.filter(sec => {
+                  const sStart = normalizeDate(sec.startDate);
+                  const sEnd = normalizeDate(sec.endDate) || sStart;
+                  if (!sStart) return false;
+                  return day.date >= sStart && day.date <= sEnd;
+                });
 
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-extrabold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                      Stop {sIdx + 1}
-                    </span>
-                    <h3 className="font-display font-bold text-lg text-text-dark leading-none">
-                      {stop.city}, {stop.country}
-                    </h3>
-                    <p className="text-xs text-text-muted font-medium">
-                      Dates: {stop.arrivalDate} to {stop.departureDate} ({stop.durationDays} days)
-                    </p>
-                    <div className="text-xs font-semibold text-stone-600">
-                      Planned Activities: <span className="text-primary font-bold">{stopActivitiesCount}</span>
+                return (
+                  <div key={day.date} className="relative group">
+                    {/* Timeline dot */}
+                    <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-primary border-4 border-white shadow-xs group-hover:scale-110 transition-transform" />
+
+                    <div className="space-y-4">
+                      {/* Day Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-extrabold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                            Day {day.dayNumber}
+                          </span>
+                          <h3 className="font-display font-bold text-base text-text-dark">
+                            {day.label}
+                          </h3>
+                        </div>
+                        {day.stop && (
+                          <span className="flex items-center gap-1 text-xs font-semibold text-stone-600 bg-stone-100 px-2.5 py-1 rounded-lg">
+                            <MapPin className="w-3.5 h-3.5 text-stone-400" />
+                            {day.stop.city}, {day.stop.country}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Day Content */}
+                      <div className="space-y-3">
+                        {/* 1. Activities list (if any) */}
+                        {dayActivities.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="text-[11px] font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5 text-stone-400" />
+                              Scheduled Activities ({dayActivities.length})
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {dayActivities.map(act => (
+                                <div key={act.id} className="p-3 bg-bg-warm border border-stone-200/80 rounded-xl flex items-start justify-between gap-2">
+                                  <div className="space-y-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-bold font-mono text-primary bg-white px-1.5 py-0.5 rounded border border-stone-200">
+                                        {act.time || '09:00'}
+                                      </span>
+                                      <span className="font-semibold text-xs text-stone-900 truncate">
+                                        {act.activityName || act.title}
+                                      </span>
+                                    </div>
+                                    {act.notes && (
+                                      <p className="text-[11px] text-stone-500 line-clamp-1">{act.notes}</p>
+                                    )}
+                                  </div>
+                                  {act.cost > 0 && (
+                                    <span className="text-xs font-bold text-stone-800 shrink-0">
+                                      ${act.cost}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. Saved Itinerary Sections (if any) */}
+                        {daySections.length > 0 && (
+                          <div className="space-y-2 pt-1">
+                            <div className="text-[11px] font-bold text-primary uppercase tracking-wider flex items-center gap-1">
+                              <Layers className="w-3.5 h-3.5 text-primary" />
+                              Itinerary Sections ({daySections.length})
+                            </div>
+                            <div className="space-y-2.5">
+                              {daySections.map(sec => (
+                                <div
+                                  key={sec.id}
+                                  className="p-4 bg-emerald-50/50 border border-emerald-200/80 rounded-2xl space-y-2"
+                                >
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <h4 className="font-bold text-xs text-emerald-950 uppercase tracking-wide">
+                                      {sec.title}
+                                    </h4>
+                                    {sec.budget > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-white px-2.5 py-0.5 rounded-full border border-emerald-200 shadow-2xs">
+                                        <Wallet className="w-3 h-3 text-emerald-600" />
+                                        Budget: ${sec.budget}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {sec.description && (
+                                    <p className="text-xs text-stone-700 font-medium leading-relaxed">
+                                      {sec.description}
+                                    </p>
+                                  )}
+
+                                  <div className="flex items-center gap-2 text-[11px] text-stone-500 font-semibold pt-1">
+                                    <CalendarIcon className="w-3 h-3 text-stone-400" />
+                                    <span>
+                                      {sec.startDate} {sec.endDate && sec.endDate !== sec.startDate ? `→ ${sec.endDate}` : ''}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Empty state for day with neither activities nor sections */}
+                        {dayActivities.length === 0 && daySections.length === 0 && (
+                          <div className="p-3 bg-stone-50 border border-stone-200/60 rounded-xl text-[11px] text-stone-400 italic">
+                            No activities or sections scheduled for this date.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
