@@ -91,32 +91,41 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password, phone, city, country, additionalInfo, avatar) => {
+  const register = async (nameOrData, email, password, phone, city, country, additionalInfo, avatar) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await authService.register({ name, email, password, phone, city, country, additionalInfo, avatar });
-      setUser(data.user);
+      const payload = typeof nameOrData === 'object' && nameOrData !== null 
+        ? nameOrData 
+        : { name: nameOrData, email, password, phone, city, country, bio: additionalInfo, additionalInfo, avatar };
+
+      const data = await authService.register(payload);
+      const resData = data?.data || data;
+      const userObj = resData.user || data.user;
+      const tokenVal = resData.token || data.token;
+
+      setUser(userObj);
       setIsDemoMode(false);
-      localStorage.setItem('globetrotter_token', data.token);
-      localStorage.setItem('globetrotter_user', JSON.stringify(data.user));
+      if (tokenVal) localStorage.setItem('globetrotter_token', tokenVal);
+      if (userObj) localStorage.setItem('globetrotter_user', JSON.stringify(userObj));
       localStorage.setItem('globetrotter_demo_mode', 'false');
       setLoading(false);
-      return { success: true, message: 'Account registered successfully.' };
+      return { success: true, message: data.message || 'Account registered successfully.' };
     } catch (err) {
       console.error("Registration API failed:", err);
       // Fallback for demo when backend is offline
       if (err.message === 'Network Error' || (err.response && err.response.status === 404)) {
         console.warn("Backend offline or auth API not found. Activating offline demo fallback.");
+        const payload = typeof nameOrData === 'object' && nameOrData !== null ? nameOrData : { name: nameOrData, email, phone, city, country, bio: additionalInfo, avatar };
         const mockUser = {
           id: 'user-demo',
-          name: name,
-          email: email,
-          phone: phone,
-          city: city || 'Mumbai',
-          country: country || 'India',
-          bio: additionalInfo,
-          avatar: avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          city: payload.city || 'Mumbai',
+          country: payload.country || 'India',
+          bio: payload.bio || payload.additionalInfo,
+          avatar: payload.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'
         };
         setUser(mockUser);
         setIsDemoMode(true);
@@ -127,7 +136,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true, isDemo: true, message: 'Account created in Offline Demo Mode.' };
       }
 
-      const errMsg = err.response?.data?.message || 'Registration failed.';
+      const errMsg = err.response?.data?.message || (Array.isArray(err.response?.data?.errors) ? err.response.data.errors.join(', ') : 'Registration failed.');
       setError(errMsg);
       setLoading(false);
       throw new Error(errMsg);

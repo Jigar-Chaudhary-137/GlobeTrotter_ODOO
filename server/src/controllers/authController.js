@@ -5,7 +5,7 @@ const { successResponse, errorResponse } = require('../utils/responseHandler');
 
 const register = async (req, res, next) => {
   try {
-    const { name, email, password, city, country } = req.body;
+    const { name, email, password, city, country, phone, bio, additionalInfo } = req.body;
 
     const existingUser = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
@@ -18,6 +18,8 @@ const register = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    const userBio = bio || additionalInfo || null;
+
     const user = await prisma.user.create({
       data: {
         name: name.trim(),
@@ -25,6 +27,8 @@ const register = async (req, res, next) => {
         password: hashedPassword,
         city: city || null,
         country: country || null,
+        phone: phone || null,
+        bio: userBio,
       },
       select: {
         id: true,
@@ -33,6 +37,8 @@ const register = async (req, res, next) => {
         role: true,
         city: true,
         country: true,
+        phone: true,
+        bio: true,
         profilePic: true,
         createdAt: true,
       },
