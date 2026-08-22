@@ -1,8 +1,8 @@
 import api from './api';
 
 export const communityService = {
-  getPublicTrips: async () => {
-    const response = await api.get('/community');
+  getPublicTrips: async (params = {}) => {
+    const response = await api.get('/community', { params });
     return response.data;
   },
 

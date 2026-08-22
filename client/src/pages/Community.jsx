@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -14,7 +14,11 @@ import {
   ExternalLink, 
   Heart,
   Wallet,
-  AlertCircle
+  AlertCircle,
+  TrendingUp,
+  Clock,
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
 import Loader, { CardSkeleton } from '../components/ui/Loader';
 
@@ -25,25 +29,71 @@ export default function Community() {
 
   const [posts, setPosts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'popular'
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [copyingId, setCopyingId] = useState(null);
   const [likingIds, setLikingIds] = useState(new Set());
 
+  const searchTimerRef = useRef(null);
+
+  // Debounce search input (400ms)
+  useEffect(() => {
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 400);
+
+    return () => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+      }
+    };
+  }, [searchQuery]);
+
   // Fetch community public trips
   const fetchCommunityTrips = async () => {
+    setLoading(true);
+    setError(false);
     try {
       if (isDemoMode) {
-        setPosts(MOCK_COMMUNITY_TRIPS);
+        let result = [...MOCK_COMMUNITY_TRIPS];
+        if (debouncedSearch.trim()) {
+          const q = debouncedSearch.toLowerCase().trim();
+          result = result.filter(t => 
+            (t.name || t.title || '').toLowerCase().includes(q) ||
+            t.stops?.some(s => (s.city || '').toLowerCase().includes(q))
+          );
+        }
+        if (sortBy === 'popular') {
+          result.sort((a, b) => (b.likes || b.likeCount || 0) - (a.likes || a.likeCount || 0));
+        }
+        setPosts(result);
         setLoading(false);
         return;
       }
 
-      const response = await communityService.getPublicTrips();
+      const params = {};
+      if (debouncedSearch.trim()) {
+        params.search = debouncedSearch.trim();
+      }
+      if (sortBy === 'popular') {
+        params.sort = 'popular';
+      }
+
+      const response = await communityService.getPublicTrips(params);
       const tripsData = Array.isArray(response) ? response : (response.data || response.posts || response.trips || []);
       setPosts(tripsData);
     } catch (err) {
-      console.warn("Failed to fetch community trips from API, falling back to mock posts:", err);
-      setPosts(MOCK_COMMUNITY_TRIPS);
+      console.warn("Failed to fetch community trips from API:", err);
+      if (isDemoMode) {
+        setPosts(MOCK_COMMUNITY_TRIPS);
+      } else {
+        setError(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -51,7 +101,7 @@ export default function Community() {
 
   useEffect(() => {
     fetchCommunityTrips();
-  }, [isDemoMode]);
+  }, [debouncedSearch, sortBy, isDemoMode]);
 
   // Copy trip action
   const handleCopyTrip = async (e, shareIdOrId, tripTitle) => {
@@ -118,7 +168,7 @@ export default function Community() {
       return;
     }
 
-    if (likingIds.has(tripId)) return; // Prevent duplicate requests
+    if (likingIds.has(tripId)) return;
     setLikingIds(prev => new Set(prev).add(tripId));
 
     try {
@@ -165,55 +215,121 @@ export default function Community() {
     }
   };
 
-  // Filter posts based on search query
-  const filteredPosts = posts.filter(post => {
-    const query = searchQuery.toLowerCase();
-    const title = (post.title || post.name || '').toLowerCase();
-    const matchesTitle = title.includes(query);
-    const matchesStops = post.stops?.some(s => (s.city || '').toLowerCase().includes(query));
-    return matchesTitle || matchesStops;
-  });
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setDebouncedSearch('');
+  };
 
   return (
     <div className="space-y-8 animate-fade-in font-sans text-sm">
       {/* Header and search banner */}
-      <div className="bg-white border border-stone-200 p-6 md:p-8 rounded-3xl shadow-xs">
-        <div className="max-w-xl">
-          <h1 className="font-display font-extrabold text-2xl md:text-3xl text-text-dark tracking-tight leading-none flex items-center gap-2">
-            <Users className="w-8 h-8 text-primary" />
-            Traveler Share Board
-          </h1>
-          <p className="text-text-muted mt-2.5 text-sm">
-            Get inspired by travel plans from the community. Copy details to start building your own version.
-          </p>
-
-          <div className="mt-6 relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search shared trips by city name or route title..."
-              className="w-full pl-11 pr-4 py-3 bg-bg-warm border border-stone-200 rounded-xl text-stone-900 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm font-medium"
-            />
+      <div className="bg-white border border-stone-200 p-6 md:p-8 rounded-3xl shadow-xs space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="font-display font-extrabold text-2xl md:text-3xl text-text-dark tracking-tight leading-none flex items-center gap-2.5">
+              <Users className="w-8 h-8 text-primary" />
+              Traveler Share Board
+            </h1>
+            <p className="text-text-muted mt-2 text-sm">
+              Get inspired by public itineraries shared by travelers around the world.
+            </p>
           </div>
+
+          {/* Sort Controls */}
+          <div className="flex items-center bg-stone-100 p-1 rounded-2xl border border-stone-200 shrink-0 self-start md:self-auto">
+            <button
+              onClick={() => setSortBy('newest')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                sortBy === 'newest' 
+                  ? 'bg-white text-stone-900 shadow-xs' 
+                  : 'text-stone-500 hover:text-stone-800'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Newest
+            </button>
+            <button
+              onClick={() => setSortBy('popular')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                sortBy === 'popular' 
+                  ? 'bg-white text-stone-900 shadow-xs' 
+                  : 'text-stone-500 hover:text-stone-800'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-rose-500" />
+              Popular
+            </button>
+          </div>
+        </div>
+
+        {/* Search Input Bar */}
+        <div className="relative max-w-xl">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by city name, route, or itinerary title..."
+            className="w-full pl-11 pr-10 py-3 bg-bg-warm border border-stone-200 rounded-xl text-stone-900 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm font-medium"
+          />
+          {searchQuery && (
+            <button 
+              onClick={handleClearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 font-bold text-xs bg-stone-200 rounded-full w-5 h-5 flex items-center justify-center"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Loading list */}
+      {/* Loading state */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CardSkeleton />
           <CardSkeleton />
         </div>
-      ) : filteredPosts.length === 0 ? (
-        <div className="text-center py-12 bg-white border border-stone-200 border-dashed rounded-3xl flex flex-col items-center">
-          <AlertCircle className="w-10 h-10 text-stone-400 mb-2" />
-          <p className="text-text-muted text-sm font-semibold">No shared journeys match your search query.</p>
+      ) : error ? (
+        /* Error State */
+        <div className="text-center py-12 bg-white border border-stone-200 rounded-3xl p-8 flex flex-col items-center max-w-md mx-auto space-y-3">
+          <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center border border-rose-100">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h3 className="font-display font-extrabold text-lg text-stone-900">Unable to load community trips</h3>
+          <p className="text-text-muted text-xs">Please check your network connection or server status and try again.</p>
+          <button
+            onClick={fetchCommunityTrips}
+            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-hover transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Try Again
+          </button>
+        </div>
+      ) : posts.length === 0 ? (
+        /* Empty State */
+        <div className="text-center py-14 bg-white border border-stone-200 border-dashed rounded-3xl flex flex-col items-center p-8 space-y-3">
+          <div className="w-12 h-12 bg-stone-50 text-stone-400 rounded-full flex items-center justify-center border border-stone-200">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <h3 className="font-display font-bold text-base text-stone-800">
+            {debouncedSearch ? 'No matching shared journeys found' : 'No public trips available yet'}
+          </h3>
+          <p className="text-text-muted text-xs max-w-sm">
+            {debouncedSearch ? `No trips match "${debouncedSearch}". Try clearing your search query.` : 'Be the first traveler to publish your itinerary to the share board!'}
+          </p>
+          {debouncedSearch && (
+            <button
+              onClick={handleClearSearch}
+              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 text-xs font-bold rounded-xl transition-colors"
+            >
+              Clear Search
+            </button>
+          )}
         </div>
       ) : (
+        /* Public Trips Feed */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredPosts.map((post) => {
+          {posts.map((post) => {
             const tripTitle = post.title || post.name || 'Untitled Journey';
             const tripBudget = post.totalBudget ?? post.budget ?? post.estimatedCost ?? 0;
             const tripLikes = post.likeCount ?? post.likes ?? 0;
