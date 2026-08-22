@@ -519,9 +519,7 @@ export default function TripBuilder() {
         }
         addToast('Expense added!', 'success');
       } else {
-        // Call generic PUT update API for expenses
-        const updatedExpenses = [...(trip.expenses || []), expensePayload];
-        await tripService.updateTrip(trip.id, { expenses: updatedExpenses });
+        await tripService.addExpense(trip.id, expensePayload);
         addToast('Expense added successfully!', 'success');
         await fetchTripDetails();
       }
@@ -554,8 +552,7 @@ export default function TripBuilder() {
         }
         addToast('Expense removed!', 'success');
       } else {
-        const updatedExpenses = (trip.expenses || []).filter(e => e.id !== expId);
-        await tripService.updateTrip(trip.id, { expenses: updatedExpenses });
+        await tripService.deleteExpense(trip.id, expId);
         addToast('Expense removed!', 'success');
         await fetchTripDetails();
       }

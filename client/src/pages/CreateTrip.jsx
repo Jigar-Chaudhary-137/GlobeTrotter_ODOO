@@ -63,7 +63,9 @@ export default function CreateTrip() {
     setSelectedPlace(val);
     setCurrentCity(val);
     setTripName(`Trip to ${val}`);
-    setBudget('1500'); // default budget cap
+    if (!budget) {
+      setBudget('2500'); // default budget cap if not specified
+    }
     const matchedCity = MOCK_CITIES.find(c => c.name.toLowerCase() === val.toLowerCase());
     if (matchedCity) {
       setCurrentCountry(matchedCity.country);
@@ -91,8 +93,8 @@ export default function CreateTrip() {
         name: `Trip to ${selectedPlace}`,
         startDate,
         endDate,
-        totalBudget: Number(budget || 1500),
-        budget: Number(budget || 1500),
+        totalBudget: Number(budget) || 2500,
+        budget: Number(budget) || 2500,
         stops: finalStops.map((s, idx) => ({
           city: s.city,
           country: s.country,
@@ -117,7 +119,7 @@ export default function CreateTrip() {
           title: `Trip to ${selectedPlace}`,
           startDate,
           endDate,
-          budget: Number(budget || 1500),
+          budget: Number(budget) || 2500,
           isPublic: false,
           stops: finalStops,
           itinerary: initialItinerary,
@@ -274,7 +276,7 @@ export default function CreateTrip() {
               <p className="text-text-muted text-xs mt-1">Select your destination, set your dates, and select recommended activities below.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               {/* Select a Place */}
               <div>
                 <label htmlFor="selectedPlace" className="block text-xs font-bold text-text-dark uppercase tracking-wider mb-1.5 flex items-center gap-1">
@@ -329,6 +331,22 @@ export default function CreateTrip() {
                   }`}
                 />
                 {errors.endDate && <p className="text-xs text-rose-600 font-medium mt-1">{errors.endDate}</p>}
+              </div>
+
+              {/* Trip Budget */}
+              <div>
+                <label htmlFor="budget" className="block text-xs font-bold text-text-dark uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <Wallet className="w-4 h-4 text-stone-400" />
+                  Trip Budget ($)
+                </label>
+                <input
+                  id="budget"
+                  type="number"
+                  placeholder="e.g. 2500"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  className="w-full p-3 bg-bg-warm border border-stone-200 rounded-xl text-sm font-semibold text-stone-850 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
               </div>
             </div>
 

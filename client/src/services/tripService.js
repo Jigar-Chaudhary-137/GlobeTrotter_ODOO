@@ -101,6 +101,22 @@ export const tripService = {
     return response.data;
   },
 
+  // Expenses
+  getTripExpenses: async (tripId) => {
+    const response = await api.get(`/trips/${tripId}/expenses`);
+    return response.data;
+  },
+
+  addExpense: async (tripId, expenseData) => {
+    const response = await api.post(`/trips/${tripId}/expenses`, expenseData);
+    return response.data;
+  },
+
+  deleteExpense: async (tripId, expenseId) => {
+    const response = await api.delete(`/trips/${tripId}/expenses/${expenseId}`);
+    return response.data;
+  },
+
   // Public operations
   publishTrip: async (tripId, isPublic = true) => {
     const response = await api.post(`/trips/${tripId}/publish`);
