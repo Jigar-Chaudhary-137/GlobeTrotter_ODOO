@@ -24,7 +24,7 @@ async function getWeatherForecast({ city, lat, lng }) {
   let cityName = city || 'Location';
 
   // Resolve coordinates from city name if missing
-  if ((isNaN(targetLat) || isNaN(targetLng) || targetLat === 0) && city) {
+  if ((isNaN(targetLat) || isNaN(targetLng) || (targetLat === 0 && targetLng === 0)) && city) {
     try {
       const destinations = await searchDestinations(city, 1);
       if (destinations.length > 0) {
@@ -39,7 +39,7 @@ async function getWeatherForecast({ city, lat, lng }) {
 
   // If coordinates still unresolvable, return clean empty weather object
   if (isNaN(targetLat) || isNaN(targetLng) || (targetLat === 0 && targetLng === 0)) {
-    return normalizeWeather(null, cityName);
+    return normalizeWeather(null, cityName, 0, 0);
   }
 
   try {
@@ -54,10 +54,10 @@ async function getWeatherForecast({ city, lat, lng }) {
       timeout: 4000 // Fast 4-second timeout to ensure non-blocking performance
     });
 
-    return normalizeWeather(response.data, cityName);
+    return normalizeWeather(response.data, cityName, targetLat, targetLng);
   } catch (err) {
     console.warn(`[Weather Service Warning]: Open-Meteo request failed (${err.message}). Returning fallback weather structure.`);
-    return normalizeWeather(null, cityName);
+    return normalizeWeather(null, cityName, targetLat, targetLng);
   }
 }
 

@@ -36,10 +36,15 @@ async function getRecommendedPlaces({ city, lat, lng }) {
   let cityName = city || 'Destination';
 
   if ((isNaN(destLat) || isNaN(destLng) || destLat === 0) && city) {
-    const destinations = await searchDestinations(city, 1);
-    if (destinations.length > 0) {
-      destLat = destinations[0].lat;
-      destLng = destinations[0].lng;
+    try {
+      const destinations = await searchDestinations(city, 1);
+      if (destinations.length > 0) {
+        destLat = destinations[0].lat;
+        destLng = destinations[0].lng;
+        cityName = destinations[0].name;
+      }
+    } catch (err) {
+      console.warn(`[Recommendation Resolution Warning]: ${err.message}`);
     }
   }
 
@@ -53,23 +58,25 @@ async function getRecommendedPlaces({ city, lat, lng }) {
   });
 
   // Group by categories
-  const attractions = allActivities.filter(a => a.category === 'attraction' || a.category === 'entertainment').slice(0, 5);
+  const attractions = allActivities.filter(a => a.category === 'attractions' || a.category === 'entertainment').slice(0, 5);
   const culture = allActivities.filter(a => a.category === 'culture').slice(0, 5);
   const dining = allActivities.filter(a => a.category === 'dining').slice(0, 5);
   const outdoors = allActivities.filter(a => a.category === 'outdoors').slice(0, 5);
 
   // Distribute remaining items if specific categories are sparse
-  const unclassified = allActivities.filter(a => 
-    !attractions.includes(a) && !culture.includes(a) && !dining.includes(a) && !outdoors.includes(a)
-  );
+  const assigned = new Set([...attractions, ...culture, ...dining, ...outdoors]);
+  const unassigned = allActivities.filter(a => !assigned.has(a));
 
-  if (attractions.length < 3 && unclassified.length > 0) {
-    attractions.push(...unclassified.splice(0, 3 - attractions.length));
+  if (attractions.length < 3 && unassigned.length > 0) {
+    attractions.push(...unassigned.splice(0, 3 - attractions.length));
+  }
+  if (culture.length < 2 && unassigned.length > 0) {
+    culture.push(...unassigned.splice(0, 2 - culture.length));
   }
 
   return {
     city: cityName,
-    coordinates: { lat: destLat, lng: destLng },
+    coordinates: { lat: destLat || 0, lng: destLng || 0 },
     totalFound: allActivities.length,
     recommendations: {
       attractions: attractions,

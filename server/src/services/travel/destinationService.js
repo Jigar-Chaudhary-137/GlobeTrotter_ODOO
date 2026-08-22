@@ -21,6 +21,7 @@ async function searchDestinations(query, limit = 10) {
   }
 
   const cleanQuery = query.trim();
+  const maxLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
   const apiKey = process.env.GEOAPIFY_API_KEY;
 
   // Attempt Primary API: Geoapify Geocoding
@@ -30,19 +31,19 @@ async function searchDestinations(query, limit = 10) {
         params: {
           text: cleanQuery,
           type: 'city',
-          limit: limit,
+          limit: maxLimit,
           apiKey: apiKey
         },
         timeout: 5000
       });
 
-      if (response.data && response.data.features && response.data.features.length > 0) {
+      if (response.data && Array.isArray(response.data.features) && response.data.features.length > 0) {
         return response.data.features
           .map(normalizeDestination)
           .filter(Boolean);
       }
     } catch (err) {
-      console.warn(`[Geoapify Destination Search Warning]: ${err.message}. Falling back to OpenStreetMap Nominatim.`);
+      console.warn(`[Geoapify Destination Search Warning]: ${err.message}. Trying Nominatim fallback.`);
     }
   }
 
@@ -53,7 +54,7 @@ async function searchDestinations(query, limit = 10) {
         q: cleanQuery,
         format: 'json',
         addressdetails: 1,
-        limit: limit
+        limit: maxLimit
       },
       headers: {
         'User-Agent': 'GlobeTrotter-TravelApp/1.0'
@@ -67,7 +68,7 @@ async function searchDestinations(query, limit = 10) {
         .filter(Boolean);
     }
   } catch (fallbackErr) {
-    console.error(`[Nominatim Destination Search Error]: ${fallbackErr.message}`);
+    console.warn(`[Nominatim Destination Search Warning]: ${fallbackErr.message}`);
   }
 
   return [];

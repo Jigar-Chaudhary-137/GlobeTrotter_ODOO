@@ -1,9 +1,34 @@
 /**
- * Travel Data Normalization Utility for GlobeTrotter
+ * Travel & Weather Data Normalization Utility for GlobeTrotter
  * Member 3 Responsibility
  */
 
 const { calculateHaversineDistance } = require('./travelUtils');
+
+/**
+ * Normalizes raw category string to standard simple category set:
+ * attractions, culture, dining, outdoors, entertainment, shopping
+ */
+function normalizeCategoryString(inputCat) {
+  if (!inputCat) return 'attractions';
+  const c = String(inputCat).toLowerCase();
+  if (c.includes('museum') || c.includes('culture') || c.includes('historic') || c.includes('heritage') || c.includes('art')) {
+    return 'culture';
+  }
+  if (c.includes('restaurant') || c.includes('dining') || c.includes('catering') || c.includes('cafe') || c.includes('food')) {
+    return 'dining';
+  }
+  if (c.includes('park') || c.includes('outdoor') || c.includes('nature') || c.includes('garden') || c.includes('beach')) {
+    return 'outdoors';
+  }
+  if (c.includes('shopping') || c.includes('mall') || c.includes('market') || c.includes('commercial')) {
+    return 'shopping';
+  }
+  if (c.includes('entertainment') || c.includes('leisure') || c.includes('cinema') || c.includes('theater')) {
+    return 'entertainment';
+  }
+  return 'attractions';
+}
 
 /**
  * Normalizes raw destination geocoding data from Geoapify or Nominatim.
@@ -13,10 +38,9 @@ const { calculateHaversineDistance } = require('./travelUtils');
 function normalizeDestination(item) {
   if (!item) return null;
 
-  // Handle Geoapify structure vs Nominatim structure
   const properties = item.properties || item;
   
-  const name = properties.city || properties.name || properties.display_name?.split(',')[0] || 'Unknown Destination';
+  const name = properties.city || properties.name || (properties.display_name ? properties.display_name.split(',')[0] : 'Unknown Destination');
   const country = properties.country || properties.address?.country || '';
   const state = properties.state || properties.county || properties.address?.state || '';
   const formattedName = properties.formatted || properties.display_name || `${name}${country ? `, ${country}` : ''}`;
@@ -31,14 +55,14 @@ function normalizeDestination(item) {
     lon2: Number(item.boundingbox[3])
   } : null);
 
-  const placeId = properties.place_id || properties.osm_id || `dest_${Math.random().toString(36).substr(2, 9)}`;
+  const placeId = properties.place_id || properties.osm_id || `dest_${Math.random().toString(36).substring(2, 9)}`;
 
   return {
     id: String(placeId),
-    name: name.trim(),
-    state: state.trim(),
-    country: country.trim(),
-    formattedName: formattedName.trim(),
+    name: String(name).trim(),
+    state: String(state).trim(),
+    country: String(country).trim(),
+    formattedName: String(formattedName).trim(),
     lat: isNaN(lat) ? 0 : lat,
     lng: isNaN(lng) ? 0 : lng,
     bbox: bbox || null,
@@ -47,7 +71,7 @@ function normalizeDestination(item) {
 }
 
 /**
- * Normalizes raw activity / place data from Geoapify Places API.
+ * Normalizes raw activity / place data from Geoapify Places API or Nominatim.
  * @param {Object} item 
  * @param {number} [refLat] 
  * @param {number} [refLng] 
@@ -57,41 +81,56 @@ function normalizeActivity(item, refLat, refLng) {
   if (!item) return null;
 
   const properties = item.properties || item;
-  const name = properties.name || properties.title || properties.display_name?.split(',')[0] || 'Popular Attraction';
+  const name = properties.name || properties.title || (properties.display_name ? properties.display_name.split(',')[0] : 'Popular Attraction');
   
   const lat = Number(properties.lat || properties.latitude || item.lat);
   const lng = Number(properties.lon || properties.longitude || item.lon);
 
   // Extract category
-  let category = 'attraction';
+  let categoryRaw = 'attractions';
   if (properties.categories && Array.isArray(properties.categories)) {
-    const cats = properties.categories.join(' ');
-    if (cats.includes('catering') || cats.includes('restaurant')) category = 'dining';
-    else if (cats.includes('entertainment') || cats.includes('leisure')) category = 'entertainment';
-    else if (cats.includes('park') || cats.includes('nature')) category = 'outdoors';
-    else if (cats.includes('museum') || cats.includes('historic') || cats.includes('heritage')) category = 'culture';
+    categoryRaw = properties.categories.join(' ');
   } else if (properties.category) {
-    category = String(properties.category).toLowerCase();
+    categoryRaw = String(properties.category);
+  } else if (properties.type) {
+    categoryRaw = String(properties.type);
   }
 
+  const category = normalizeCategoryString(categoryRaw);
+
   const address = properties.address_line2 || properties.formatted || properties.display_name || '';
-  const placeId = properties.place_id || properties.osm_id || `act_${Math.random().toString(36).substr(2, 9)}`;
+  const placeId = properties.place_id || properties.osm_id || `act_${Math.random().toString(36).substring(2, 9)}`;
 
   let distanceKm = 0;
-  if (refLat !== undefined && refLng !== undefined && !isNaN(lat) && !isNaN(lng)) {
+  if (refLat !== undefined && refLng !== undefined && !isNaN(refLat) && !isNaN(refLng) && !isNaN(lat) && !isNaN(lng)) {
     distanceKm = calculateHaversineDistance(refLat, refLng, lat, lng);
+  }
+
+  // Derive priceCategory
+  let priceCategory = '$';
+  if (category === 'outdoors') priceCategory = 'Free';
+  else if (category === 'dining') priceCategory = '$$';
+  else if (category === 'shopping') priceCategory = '$$';
+  else if (category === 'culture' || category === 'attractions') priceCategory = '$';
+
+  if (properties.price_level !== undefined) {
+    if (properties.price_level === 0) priceCategory = 'Free';
+    else if (properties.price_level === 1) priceCategory = '$';
+    else if (properties.price_level === 2) priceCategory = '$$';
+    else if (properties.price_level >= 3) priceCategory = '$$$';
   }
 
   return {
     id: String(placeId),
-    name: name.trim(),
+    name: String(name).trim(),
     category: category,
-    address: address.trim(),
+    address: String(address).trim(),
     lat: isNaN(lat) ? 0 : lat,
     lng: isNaN(lng) ? 0 : lng,
-    distanceKm: distanceKm,
-    rating: properties.rank?.popularity ? Math.min(5, Math.max(3, Math.round(properties.rank.popularity * 5))) : 4.5,
-    description: properties.description || `${name} in ${properties.city || 'destination'}`
+    description: properties.description || `${name} in ${properties.city || 'destination'}`,
+    rating: properties.rank?.popularity ? Math.min(5, Math.max(3.5, Number((properties.rank.popularity * 5).toFixed(1)))) : 4.5,
+    priceCategory: priceCategory,
+    distanceKm: Number(distanceKm.toFixed(2))
   };
 }
 
@@ -99,16 +138,25 @@ function normalizeActivity(item, refLat, refLng) {
  * Normalizes Open-Meteo weather response.
  * @param {Object} weatherData 
  * @param {string} cityName 
+ * @param {number} [fallbackLat]
+ * @param {number} [fallbackLng]
  * @returns {Object} Clean normalized weather object
  */
-function normalizeWeather(weatherData, cityName = 'Requested Location') {
+function normalizeWeather(weatherData, cityName = 'Requested Location', fallbackLat = 0, fallbackLng = 0) {
   if (!weatherData || !weatherData.current_weather) {
     return {
       city: cityName,
+      coordinates: {
+        lat: fallbackLat || 0,
+        lng: fallbackLng || 0
+      },
+      current: {
+        temperature: null,
+        condition: 'Unavailable',
+        windSpeed: null
+      },
       currentTemp: null,
-      tempUnit: '°C',
       condition: 'Unavailable',
-      humidity: null,
       windSpeed: null,
       dailyForecast: []
     };
@@ -119,7 +167,7 @@ function normalizeWeather(weatherData, cityName = 'Requested Location') {
 
   // Weather code map according to WMO Weather interpretation codes
   const getWeatherCondition = (code) => {
-    if (code === 0) return 'Clear Sky';
+    if (code === 0) return 'Clear';
     if (code >= 1 && code <= 3) return 'Partly Cloudy';
     if (code >= 45 && code <= 48) return 'Foggy';
     if (code >= 51 && code <= 67) return 'Rainy';
@@ -131,25 +179,35 @@ function normalizeWeather(weatherData, cityName = 'Requested Location') {
 
   const dailyForecast = (daily.time || []).map((dateStr, idx) => ({
     date: dateStr,
-    maxTemp: daily.temperature_2m_max ? daily.temperature_2m_max[idx] : null,
-    minTemp: daily.temperature_2m_min ? daily.temperature_2m_min[idx] : null,
-    rainProbability: daily.precipitation_probability_max ? daily.precipitation_probability_max[idx] : 0,
+    maxTemp: daily.temperature_2m_max ? Math.round(daily.temperature_2m_max[idx]) : null,
+    minTemp: daily.temperature_2m_min ? Math.round(daily.temperature_2m_min[idx]) : null,
+    precipitationProbability: daily.precipitation_probability_max ? daily.precipitation_probability_max[idx] : 0,
     condition: daily.weathercode ? getWeatherCondition(daily.weathercode[idx]) : 'Clear'
   }));
 
+  const resLat = weatherData.latitude !== undefined ? weatherData.latitude : fallbackLat;
+  const resLng = weatherData.longitude !== undefined ? weatherData.longitude : fallbackLng;
+
   return {
     city: cityName,
-    lat: weatherData.latitude || 0,
-    lng: weatherData.longitude || 0,
-    currentTemp: current.temperature,
-    tempUnit: '°C',
+    coordinates: {
+      lat: Number(resLat),
+      lng: Number(resLng)
+    },
+    current: {
+      temperature: Math.round(current.temperature),
+      condition: getWeatherCondition(current.weathercode),
+      windSpeed: Math.round(current.windspeed)
+    },
+    currentTemp: Math.round(current.temperature),
     condition: getWeatherCondition(current.weathercode),
-    windSpeed: current.windspeed,
+    windSpeed: Math.round(current.windspeed),
     dailyForecast: dailyForecast
   };
 }
 
 module.exports = {
+  normalizeCategoryString,
   normalizeDestination,
   normalizeActivity,
   normalizeWeather

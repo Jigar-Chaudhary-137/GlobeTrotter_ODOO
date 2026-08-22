@@ -8,11 +8,12 @@ const { normalizeActivity } = require('../../utils/dataNormalizer');
 const { sortActivitiesByDistance } = require('../../utils/travelUtils');
 const { searchDestinations } = require('./destinationService');
 
-// Map internal GlobeTrotter category strings to Geoapify category categories
+// Map internal GlobeTrotter category strings to Geoapify Places categories
 const GEOAPIFY_CATEGORY_MAP = {
   attractions: 'tourism.sights,building.historic,heritage',
-  dining: 'catering.restaurant,catering.cafe',
   culture: 'entertainment.museum,building.historic,heritage',
+  museums: 'entertainment.museum,building.historic,heritage',
+  dining: 'catering.restaurant,catering.cafe',
   outdoors: 'leisure.park,natural',
   entertainment: 'entertainment,leisure',
   shopping: 'commercial.shopping_mall,commercial.marketplace',
@@ -28,7 +29,7 @@ const GEOAPIFY_CATEGORY_MAP = {
  * @param {string} [params.city] City name (e.g. "Paris", "London", "Tokyo")
  * @param {number} [params.lat] Latitude
  * @param {number} [params.lng] Longitude
- * @param {string} [params.category="all"] Category filter (attractions, dining, culture, outdoors, entertainment)
+ * @param {string} [params.category="all"] Category filter
  * @param {number} [params.limit=20] Max results
  * @returns {Promise<Array>} Normalized array of activity objects
  */
@@ -39,15 +40,21 @@ async function searchActivities({ city, lat, lng, category = 'all', limit = 20 }
 
   // Resolve coordinates if missing
   if ((isNaN(searchLat) || isNaN(searchLng) || searchLat === 0) && cityName) {
-    const destinations = await searchDestinations(cityName, 1);
-    if (destinations.length > 0) {
-      searchLat = destinations[0].lat;
-      searchLng = destinations[0].lng;
+    try {
+      const destinations = await searchDestinations(cityName, 1);
+      if (destinations.length > 0) {
+        searchLat = destinations[0].lat;
+        searchLng = destinations[0].lng;
+      }
+    } catch (resolveErr) {
+      console.warn(`[Activity Service Coordinates Resolution Warning]: ${resolveErr.message}`);
     }
   }
 
+  const maxLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 50);
   const apiKey = process.env.GEOAPIFY_API_KEY;
-  const categories = GEOAPIFY_CATEGORY_MAP[category.toLowerCase()] || GEOAPIFY_CATEGORY_MAP.all;
+  const cleanCatKey = (category || 'all').toLowerCase().trim();
+  const categories = GEOAPIFY_CATEGORY_MAP[cleanCatKey] || GEOAPIFY_CATEGORY_MAP.all;
 
   // Primary API: Geoapify Places API
   if (apiKey && !isNaN(searchLat) && !isNaN(searchLng) && searchLat !== 0) {
@@ -57,13 +64,13 @@ async function searchActivities({ city, lat, lng, category = 'all', limit = 20 }
           categories: categories,
           filter: `circle:${searchLng},${searchLat},10000`, // 10km radius
           bias: `proximity:${searchLng},${searchLat}`,
-          limit: limit,
+          limit: maxLimit,
           apiKey: apiKey
         },
         timeout: 5000
       });
 
-      if (response.data && response.data.features && response.data.features.length > 0) {
+      if (response.data && Array.isArray(response.data.features) && response.data.features.length > 0) {
         const activities = response.data.features
           .map((item) => normalizeActivity(item, searchLat, searchLng))
           .filter(Boolean);
@@ -80,15 +87,14 @@ async function searchActivities({ city, lat, lng, category = 'all', limit = 20 }
 
   if (cleanCity || (!isNaN(searchLat) && searchLat !== 0)) {
     try {
-      const cleanCategory = category === 'all' ? 'attractions' : category;
+      const queryCat = cleanCatKey === 'all' ? 'attractions' : cleanCatKey;
       let searchQueries = [];
 
       if (cleanCity) {
-        searchQueries.push(`${cleanCategory} in ${cleanCity}`);
+        searchQueries.push(`${queryCat} in ${cleanCity}`);
         searchQueries.push(`${cleanCity} attractions`);
-        searchQueries.push(`${cleanCity} tourism`);
       } else {
-        searchQueries.push(cleanCategory);
+        searchQueries.push(queryCat);
       }
 
       for (const queryTerm of searchQueries) {
@@ -97,7 +103,7 @@ async function searchActivities({ city, lat, lng, category = 'all', limit = 20 }
             q: queryTerm,
             format: 'json',
             addressdetails: 1,
-            limit: limit
+            limit: maxLimit
           },
           headers: {
             'User-Agent': 'GlobeTrotter-TravelApp/1.0'
@@ -114,7 +120,7 @@ async function searchActivities({ city, lat, lng, category = 'all', limit = 20 }
         }
       }
     } catch (fallbackErr) {
-      console.error(`[Nominatim Places Search Error]: ${fallbackErr.message}`);
+      console.warn(`[Nominatim Places Search Warning]: ${fallbackErr.message}`);
     }
   }
 
