@@ -10,7 +10,7 @@ Make sure the following tools are installed on your machine:
 
 * **Node.js**: `v18.0.0` or higher ([nodejs.org](https://nodejs.org/))
 * **npm**: `v9.0.0` or higher
-* **PostgreSQL**: `v14` or higher (running locally or via cloud e.g. Supabase/ElephantSQL)
+* **PostgreSQL**: `v14` or higher (running locally or via cloud PostgreSQL database)
 * **Git**: `v2.30` or higher
 
 ---

@@ -34,14 +34,26 @@ export default function MainLanding() {
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
 
-  // Extend mock cities with continent data for filter/group functionality
-  const REGIONS = [
-    { ...MOCK_CITIES[0], continent: 'Europe' }, // Paris
-    { ...MOCK_CITIES[1], continent: 'Europe' }, // London
-    { ...MOCK_CITIES[2], continent: 'Asia' },   // Tokyo
-    { ...MOCK_CITIES[3], continent: 'Middle East' }, // Dubai
-    { ...MOCK_CITIES[4], continent: 'Asia' },   // Mumbai
-  ];
+  const CONTINENT_MAP = {
+    France: 'Europe',
+    'United Kingdom': 'Europe',
+    Japan: 'Asia',
+    'United States': 'North America',
+    'United Arab Emirates': 'Middle East',
+    Singapore: 'Asia',
+    Italy: 'Europe',
+    Spain: 'Europe',
+    Australia: 'Oceania',
+    Indonesia: 'Asia',
+    Turkey: 'Europe',
+    Switzerland: 'Europe',
+    India: 'Asia'
+  };
+
+  const REGIONS = MOCK_CITIES.map(city => ({
+    ...city,
+    continent: CONTINENT_MAP[city.country] || 'Other'
+  }));
 
   // Fetch / Combine Trips
   useEffect(() => {
@@ -106,6 +118,8 @@ export default function MainLanding() {
   const handleTripCardClick = (tripId) => {
     navigate(`/trips/${tripId}`);
   };
+
+  const FALLBACK_CITY_IMAGE = 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80';
 
   return (
     <div className="space-y-10 font-sans pb-16">
@@ -268,9 +282,13 @@ export default function MainLanding() {
                     >
                       <div className="h-32 w-full overflow-hidden relative">
                         <img 
-                          src={city.image} 
+                          src={city.image || FALLBACK_CITY_IMAGE} 
                           alt={city.name}
                           className="w-full h-full object-cover transform duration-300 group-hover:scale-105"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = FALLBACK_CITY_IMAGE;
+                          }}
                         />
                         <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-xs text-[10px] text-white px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
                           {city.continent}
@@ -297,9 +315,13 @@ export default function MainLanding() {
               >
                 <div className="h-36 w-full overflow-hidden relative">
                   <img 
-                    src={city.image} 
+                    src={city.image || FALLBACK_CITY_IMAGE} 
                     alt={city.name}
                     className="w-full h-full object-cover transform duration-300 group-hover:scale-105"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = FALLBACK_CITY_IMAGE;
+                    }}
                   />
                   <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-xs text-[10px] text-white px-2 py-0.5 rounded-md font-bold uppercase tracking-wider">
                     {city.continent}

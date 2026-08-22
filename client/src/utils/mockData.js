@@ -21,10 +21,19 @@ export const MOCK_CITIES = [
     id: 'tokyo',
     name: 'Tokyo',
     country: 'Japan',
-    image: 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?auto=format&fit=crop&w=800&q=80',
+    image: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=800&q=80',
     description: 'Japan’s busy capital mixes ultra-modern skyscrapers with historic temples.',
     lat: 35.6762,
     lon: 139.6503
+  },
+  {
+    id: 'new-york',
+    name: 'New York',
+    country: 'United States',
+    image: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=800&q=80',
+    description: 'Home to the Empire State Building, Times Square, and Central Park.',
+    lat: 40.7128,
+    lon: -74.0060
   },
   {
     id: 'dubai',
@@ -36,6 +45,69 @@ export const MOCK_CITIES = [
     lon: 55.2708
   },
   {
+    id: 'singapore',
+    name: 'Singapore',
+    country: 'Singapore',
+    image: 'https://images.unsplash.com/photo-1525625293386-3f8f99389edd?auto=format&fit=crop&w=800&q=80',
+    description: 'A vibrant island city-state famous for futuristic gardens and world-class street food.',
+    lat: 1.3521,
+    lon: 103.8198
+  },
+  {
+    id: 'rome',
+    name: 'Rome',
+    country: 'Italy',
+    image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&w=800&q=80',
+    description: 'The Eternal City, packed with ancient monuments, Vatican treasures, and authentic pasta.',
+    lat: 41.9028,
+    lon: 12.4964
+  },
+  {
+    id: 'barcelona',
+    name: 'Barcelona',
+    country: 'Spain',
+    image: 'https://images.unsplash.com/photo-1583422409516-2895a77efded?auto=format&fit=crop&w=800&q=80',
+    description: 'Renowned for Antoni Gaudi’s architecture, Mediterranean beaches, and vibrant tapas bars.',
+    lat: 41.3851,
+    lon: 2.1734
+  },
+  {
+    id: 'sydney',
+    name: 'Sydney',
+    country: 'Australia',
+    image: 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?auto=format&fit=crop&w=800&q=80',
+    description: 'Australia’s coastal metropolis known for the Opera House, Harbour Bridge, and beaches.',
+    lat: -33.8688,
+    lon: 151.2093
+  },
+  {
+    id: 'bali',
+    name: 'Bali',
+    country: 'Indonesia',
+    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=80',
+    description: 'Tropical island paradise famed for volcanic mountains, iconic rice paddies, and coral reefs.',
+    lat: -8.4095,
+    lon: 115.1889
+  },
+  {
+    id: 'istanbul',
+    name: 'Istanbul',
+    country: 'Turkey',
+    image: 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?auto=format&fit=crop&w=800&q=80',
+    description: 'A historic bridge between East and West, boasting grand mosques and grand bazaars.',
+    lat: 41.0082,
+    lon: 28.9784
+  },
+  {
+    id: 'switzerland',
+    name: 'Switzerland',
+    country: 'Switzerland',
+    image: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?auto=format&fit=crop&w=800&q=80',
+    description: 'Famed for breathtaking Alpine peaks, pristine mountain lakes, and alpine chalets.',
+    lat: 46.8182,
+    lon: 8.2275
+  },
+  {
     id: 'mumbai',
     name: 'Mumbai',
     country: 'India',
@@ -43,15 +115,6 @@ export const MOCK_CITIES = [
     description: 'A financial powerhouse, fashion epicentre and a city with a heart of gold.',
     lat: 19.0760,
     lon: 72.8777
-  },
-  {
-    id: 'new-york',
-    name: 'New York',
-    country: 'United States',
-    image: 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?auto=format&fit=crop&w=800&q=80',
-    description: 'Home to the Empire State Building, Times Square, and Central Park.',
-    lat: 40.7128,
-    lon: -74.0060
   }
 ];
 
@@ -90,6 +153,41 @@ export const MOCK_ACTIVITIES = {
     { id: 'ny2', name: 'Metropolitan Museum of Art', category: 'Culture/Museums', cost: 25, time: '11:30', duration: '3h', rating: 4.8 },
     { id: 'ny3', name: 'Broadway Show Ticket', category: 'Entertainment', cost: 120, time: '19:00', duration: '2.5h', rating: 4.6 },
     { id: 'ny4', name: 'Central Park Biking Tour', category: 'Entertainment', cost: 30, time: '15:00', duration: '2h', rating: 4.4 }
+  ],
+  singapore: [
+    { id: 'sg1', name: 'Gardens by the Bay Supertree Light Show', category: 'Attractions', cost: 20, time: '19:45', duration: '2h', rating: 4.9 },
+    { id: 'sg2', name: 'Marina Bay Sands SkyPark Observation Deck', category: 'Attractions', cost: 26, time: '16:00', duration: '1.5h', rating: 4.8 },
+    { id: 'sg3', name: 'Maxwell Food Centre Hawker Tasting', category: 'Food/Restaurants', cost: 15, time: '12:30', duration: '1.5h', rating: 4.7 }
+  ],
+  rome: [
+    { id: 'rm1', name: 'Colosseum & Roman Forum Guided Tour', category: 'Culture/Museums', cost: 35, time: '09:30', duration: '3h', rating: 4.9 },
+    { id: 'rm2', name: 'Vatican Museums & Sistine Chapel', category: 'Culture/Museums', cost: 40, time: '13:30', duration: '3h', rating: 4.8 },
+    { id: 'rm3', name: 'Trevi Fountain & Gelato Evening Stroll', category: 'Food/Restaurants', cost: 10, time: '20:00', duration: '1.5h', rating: 4.7 }
+  ],
+  barcelona: [
+    { id: 'bc1', name: 'Sagrada Familia Fast-Track Entry', category: 'Culture/Museums', cost: 32, time: '10:00', duration: '2h', rating: 4.9 },
+    { id: 'bc2', name: 'Park Guell Architectural Walk', category: 'Attractions', cost: 15, time: '14:00', duration: '2h', rating: 4.8 },
+    { id: 'bc3', name: 'La Boqueria Market Tapas Experience', category: 'Food/Restaurants', cost: 25, time: '13:00', duration: '1.5h', rating: 4.7 }
+  ],
+  sydney: [
+    { id: 'sy1', name: 'Sydney Opera House Guided Tour', category: 'Culture/Museums', cost: 30, time: '11:00', duration: '1h', rating: 4.8 },
+    { id: 'sy2', name: 'Sydney Harbour Sunset Cruise', category: 'Attractions', cost: 45, time: '17:30', duration: '2h', rating: 4.9 },
+    { id: 'sy3', name: 'Bondi Beach Surfing Lesson', category: 'Entertainment', cost: 50, time: '09:00', duration: '2h', rating: 4.6 }
+  ],
+  bali: [
+    { id: 'bl1', name: 'Tegalalang Rice Terraces & Swing', category: 'Attractions', cost: 15, time: '08:30', duration: '3h', rating: 4.8 },
+    { id: 'bl2', name: 'Uluwatu Temple Sunset & Kecak Dance', category: 'Culture/Museums', cost: 20, time: '17:00', duration: '2.5h', rating: 4.9 },
+    { id: 'bl3', name: 'Ubud Monkey Forest Walk', category: 'Attractions', cost: 10, time: '11:00', duration: '2h', rating: 4.6 }
+  ],
+  istanbul: [
+    { id: 'is1', name: 'Hagia Sophia & Blue Mosque Guided Tour', category: 'Culture/Museums', cost: 25, time: '09:00', duration: '2.5h', rating: 4.9 },
+    { id: 'is2', name: 'Bosphorus Sunset Sightseeing Cruise', category: 'Attractions', cost: 30, time: '18:00', duration: '2h', rating: 4.8 },
+    { id: 'is3', name: 'Grand Bazaar Tea & Spice Tour', category: 'Food/Restaurants', cost: 15, time: '14:00', duration: '2h', rating: 4.7 }
+  ],
+  switzerland: [
+    { id: 'sw1', name: 'Jungfraujoch Top of Europe Train Trip', category: 'Attractions', cost: 95, time: '08:30', duration: '5h', rating: 4.9 },
+    { id: 'sw2', name: 'Lake Geneva Cruise & Chillon Castle', category: 'Attractions', cost: 35, time: '13:00', duration: '3h', rating: 4.8 },
+    { id: 'sw3', name: 'Zermatt Matterhorn Viewing Deck', category: 'Attractions', cost: 55, time: '10:00', duration: '3h', rating: 4.9 }
   ]
 };
 

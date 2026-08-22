@@ -19,6 +19,8 @@ import {
 import Loader, { CardSkeleton } from '../components/ui/Loader';
 import Modal from '../components/ui/Modal';
 
+const FALLBACK_CITY_IMAGE = 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80';
+
 export default function Explore() {
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -240,9 +242,13 @@ export default function Explore() {
                 >
                   <div className="relative h-44 bg-stone-100">
                     <img 
-                      src={city.image} 
+                      src={city.image || FALLBACK_CITY_IMAGE} 
                       alt={city.name}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = FALLBACK_CITY_IMAGE;
+                      }}
                     />
                     <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs px-2.5 py-1 rounded-full text-xs font-bold text-stone-800 flex items-center gap-1 shadow-xs">
                       <MapPin className="w-3 h-3 text-primary" />
@@ -292,9 +298,13 @@ export default function Explore() {
             
             <div className="relative rounded-3xl overflow-hidden h-64 shadow-md">
               <img 
-                src={selectedCity.image} 
+                src={selectedCity.image || FALLBACK_CITY_IMAGE} 
                 alt={selectedCity.name}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = FALLBACK_CITY_IMAGE;
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end p-6 md:p-8">
                 <span className="text-xs font-bold uppercase tracking-wider text-primary-light">{selectedCity.country}</span>
