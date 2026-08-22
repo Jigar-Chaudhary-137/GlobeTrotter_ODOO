@@ -12,27 +12,46 @@ export const AuthProvider = ({ children }) => {
   // Initialize and check current user
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('globetrotter_token');
-      const savedUser = localStorage.getItem('globetrotter_user');
-      const demoFlag = localStorage.getItem('globetrotter_demo_mode') === 'true';
+      try {
+        const token = localStorage.getItem('globetrotter_token');
+        const savedUser = localStorage.getItem('globetrotter_user');
+        const demoFlag = localStorage.getItem('globetrotter_demo_mode') === 'true';
 
-      if (token && savedUser) {
-        setUser(JSON.parse(savedUser));
-        setIsDemoMode(demoFlag);
-        
-        if (!demoFlag) {
+        if (token && savedUser && savedUser !== 'undefined') {
           try {
-            // Validate token with backend
-            const profile = await authService.getProfile();
-            setUser(profile.user);
-            localStorage.setItem('globetrotter_user', JSON.stringify(profile.user));
-          } catch (err) {
-            console.warn("Could not sync profile with server, using cached session", err);
-            // If server returned 401, it will have cleared local token via api.js interceptor
+            const parsedUser = JSON.parse(savedUser);
+            if (parsedUser && parsedUser.id) {
+              setUser(parsedUser);
+            }
+          } catch (e) {
+            localStorage.removeItem('globetrotter_user');
           }
+          setIsDemoMode(demoFlag);
+          
+          if (!demoFlag) {
+            try {
+              // Validate token with backend
+              const profileData = await authService.getProfile();
+              const userObj = profileData?.user || profileData?.data?.user || profileData;
+              if (userObj && userObj.id) {
+                setUser(userObj);
+                localStorage.setItem('globetrotter_user', JSON.stringify(userObj));
+                setIsDemoMode(false);
+                localStorage.setItem('globetrotter_demo_mode', 'false');
+              }
+            } catch (err) {
+              console.warn("Could not sync profile with server, using cached session", err);
+            }
+          }
+        } else {
+          setIsDemoMode(false);
+          localStorage.removeItem('globetrotter_demo_mode');
         }
+      } catch (err) {
+        console.error("Auth initialization failed:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initAuth();
@@ -55,22 +74,30 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     try {
       const data = await authService.login({ email, password });
-      setUser(data.user);
+      const userObj = data?.user || data?.data?.user || data;
+      const tokenVal = data?.token || data?.data?.token;
+
+      if (!userObj || !tokenVal) {
+        throw new Error('Invalid authentication response from server.');
+      }
+
+      setUser(userObj);
       setIsDemoMode(false);
-      localStorage.setItem('globetrotter_token', data.token);
-      localStorage.setItem('globetrotter_user', JSON.stringify(data.user));
+      localStorage.setItem('globetrotter_token', tokenVal);
+      localStorage.setItem('globetrotter_user', JSON.stringify(userObj));
       localStorage.setItem('globetrotter_demo_mode', 'false');
       setLoading(false);
       return { success: true, message: 'Logged in successfully.' };
     } catch (err) {
       console.error("Login API failed:", err);
-      // Fallback for demo when backend is offline
-      if (err.message === 'Network Error' || (err.response && err.response.status === 404)) {
-        console.warn("Backend offline or auth API not found. Activating offline demo fallback.");
+      // Fallback for demo ONLY when backend is genuinely offline
+      if (err.message === 'Network Error') {
+        console.warn("Backend offline. Activating offline demo fallback.");
         const mockUser = {
           id: 'user-demo',
-          name: 'Demo Traveler',
+          name: email === 'admin@globetrotter.com' ? 'Demo Admin' : 'Demo Traveler',
           email: email,
+          role: email === 'admin@globetrotter.com' ? 'ADMIN' : 'USER',
           city: 'Paris',
           country: 'France',
           avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'
@@ -84,7 +111,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true, isDemo: true, message: 'Connected in Offline Demo Mode.' };
       }
       
-      const errMsg = err.response?.data?.message || 'Login failed. Please check credentials.';
+      const errMsg = err.response?.data?.message || err.message || 'Login failed. Please check credentials.';
       setError(errMsg);
       setLoading(false);
       throw new Error(errMsg);

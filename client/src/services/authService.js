@@ -3,7 +3,7 @@ import api from './api';
 export const authService = {
   register: async (userData) => {
     const response = await api.post('/auth/register', userData);
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   login: async (credentials) => {
@@ -13,19 +13,20 @@ export const authService = {
 
   getProfile: async () => {
     const response = await api.get('/profile');
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   updateProfile: async (profileData) => {
     const response = await api.put('/profile', profileData);
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   uploadProfilePhoto: async (file) => {
     const formData = new FormData();
     formData.append('photo', file);
     const response = await api.post('/profile/photo', formData);
-    return response.data;
+    return response.data?.data || response.data;
   }
 };
+
 
