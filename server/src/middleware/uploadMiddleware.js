@@ -10,7 +10,7 @@ const fileFilter = (req, file, cb) => {
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    const error = new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.');
+    const error = new Error('Please upload a valid JPG, PNG, or WebP image.');
     error.status = 400;
     cb(error, false);
   }
@@ -32,7 +32,7 @@ const uploadPhotoMiddleware = (req, res, next) => {
       }
       return errorResponse(res, 400, `Upload error: ${err.message}`);
     } else if (err) {
-      return errorResponse(res, err.status || 400, err.message || 'File upload validation failed');
+      return errorResponse(res, err.status || 400, err.message || 'Please upload a valid JPG, PNG, or WebP image.');
     }
     next();
   });

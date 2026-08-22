@@ -24,7 +24,11 @@ export const authService = {
   uploadProfilePhoto: async (file) => {
     const formData = new FormData();
     formData.append('photo', file);
-    const response = await api.post('/profile/photo', formData);
+    const response = await api.post('/profile/photo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data?.data || response.data;
   }
 };

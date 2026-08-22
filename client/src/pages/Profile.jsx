@@ -73,12 +73,14 @@ export default function Profile() {
 
     if (file.size > 5 * 1024 * 1024) {
       addToast("File size exceeds 5 MB limit.", "error");
+      e.target.value = '';
       return;
     }
 
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!validTypes.includes(file.type)) {
-      addToast("Invalid file type. Please select JPEG, PNG, or WebP.", "error");
+      addToast("Please upload a valid JPG, PNG, or WebP image.", "error");
+      e.target.value = '';
       return;
     }
 
@@ -88,9 +90,11 @@ export default function Profile() {
       addToast(res.message || "Profile photo uploaded successfully!", "success");
     } catch (err) {
       console.error("Photo upload failed:", err);
-      addToast(err.message || "Failed to upload photo.", "error");
+      const errMsg = err.response?.data?.message || err.message || "Failed to upload photo.";
+      addToast(errMsg, "error");
     } finally {
       setIsUploadingPhoto(false);
+      e.target.value = '';
     }
   };
 
