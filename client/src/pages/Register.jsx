@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { User, Mail, Phone, MapPin, Globe, FileText, Camera, Loader2, Compass } from 'lucide-react';
+import { User, Mail, Lock, Phone, MapPin, Globe, FileText, Camera, Loader2, Compass } from 'lucide-react';
 
 export default function Register() {
   const { register } = useAuth();
@@ -13,6 +13,7 @@ export default function Register() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
@@ -46,6 +47,11 @@ export default function Register() {
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       errors.email = 'Please enter a valid email address';
     }
+    if (!password) {
+      errors.password = 'Password is required';
+    } else if (password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
     if (!phone.trim()) {
       errors.phone = 'Phone number is required';
     }
@@ -70,18 +76,18 @@ export default function Register() {
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
     try {
-      // Call the existing registration service contract (passing password as undefined per user instructions)
-      const result = await register(
-        fullName, 
+      const result = await register({
+        name: fullName, 
         email, 
-        undefined, 
+        password, 
         phone, 
         city, 
         country, 
+        bio: additionalInfo, 
         additionalInfo, 
-        avatarPreview
-      );
-      addToast(result.message, 'success');
+        avatar: avatarPreview
+      });
+      addToast(result.message || 'Registration successful', 'success');
       navigate('/dashboard');
     } catch (err) {
       setApiError(err.message || 'Registration failed. Please check the fields and try again.');
@@ -203,7 +209,7 @@ export default function Register() {
                 </div>
               </div>
 
-              {/* Row 2: Email Address & Phone Number */}
+              {/* Row 2: Email Address & Password */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="email" className="block text-sm font-semibold text-text-dark">
@@ -235,34 +241,66 @@ export default function Register() {
                 </div>
 
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-semibold text-text-dark">
-                    Phone Number
+                  <label htmlFor="password" className="block text-sm font-semibold text-text-dark">
+                    Password
                   </label>
                   <div className="mt-1.5 relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                      <Phone className="h-4 w-4 text-stone-400" />
+                      <Lock className="h-4 w-4 text-stone-400" />
                     </div>
                     <input
-                      id="phone"
-                      name="phone"
-                      type="tel"
+                      id="password"
+                      name="password"
+                      type="password"
                       disabled={isSubmitting}
-                      value={phone}
+                      value={password}
                       onChange={(e) => {
-                        setPhone(e.target.value);
-                        if (formErrors.phone) setFormErrors({ ...formErrors, phone: '' });
+                        setPassword(e.target.value);
+                        if (formErrors.password) setFormErrors({ ...formErrors, password: '' });
                       }}
                       className={`block w-full pl-10 pr-4 py-2.5 bg-bg-warm border rounded-xl text-stone-900 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm ${
-                        formErrors.phone ? 'border-rose-300 ring-2 ring-rose-500/10' : 'border-stone-200'
+                        formErrors.password ? 'border-rose-300 ring-2 ring-rose-500/10' : 'border-stone-200'
                       }`}
-                      placeholder="+1 (555) 019-2834"
+                      placeholder="••••••••"
+                      autoComplete="new-password"
                     />
                   </div>
-                  {formErrors.phone && (
-                    <p className="mt-1 text-xs text-rose-600 font-medium">{formErrors.phone}</p>
+                  {formErrors.password && (
+                    <p className="mt-1 text-xs text-rose-600 font-medium">{formErrors.password}</p>
                   )}
                 </div>
               </div>
+
+              {/* Phone Number Field */}
+              <div>
+                <label htmlFor="phone" className="block text-sm font-semibold text-text-dark">
+                  Phone Number
+                </label>
+                <div className="mt-1.5 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <Phone className="h-4 w-4 text-stone-400" />
+                  </div>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    disabled={isSubmitting}
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (formErrors.phone) setFormErrors({ ...formErrors, phone: '' });
+                    }}
+                    className={`block w-full pl-10 pr-4 py-2.5 bg-bg-warm border rounded-xl text-stone-900 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm ${
+                      formErrors.phone ? 'border-rose-300 ring-2 ring-rose-500/10' : 'border-stone-200'
+                    }`}
+                    placeholder="+1 (555) 019-2834"
+                  />
+                </div>
+                {formErrors.phone && (
+                  <p className="mt-1 text-xs text-rose-600 font-medium">{formErrors.phone}</p>
+                )}
+              </div>
+
 
               {/* Row 3: City & Country */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
