@@ -11,7 +11,8 @@ import {
   X, 
   PlaneTakeoff,
   Plus,
-  Calendar
+  Calendar,
+  ShieldAlert
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -28,6 +29,10 @@ const Layout = ({ children }) => {
     { name: 'Community', path: '/community', icon: Users },
     { name: 'Profile', path: '/profile', icon: User },
   ];
+
+  if (user?.role === 'ADMIN') {
+    menuItems.push({ name: 'Admin Panel', path: '/admin', icon: ShieldAlert });
+  }
 
   const handleLogout = () => {
     logout();

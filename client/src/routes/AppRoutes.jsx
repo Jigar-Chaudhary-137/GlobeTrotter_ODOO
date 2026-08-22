@@ -16,6 +16,7 @@ import Community from '../pages/Community';
 import PublicTrip from '../pages/PublicTrip';
 import Profile from '../pages/Profile';
 import Calendar from '../pages/Calendar';
+import Admin from '../pages/Admin';
 
 // Protected Route Guard
 const PrivateRoute = ({ children }) => {
@@ -45,6 +46,25 @@ const PublicRoute = ({ children }) => {
   }
 
   return children;
+};
+
+// Admin Route Guard (Redirects to dashboard if not admin)
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <FullScreenLoader />;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role !== 'ADMIN') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <Layout>{children}</Layout>;
 };
 
 const AppRoutes = () => {
@@ -134,6 +154,14 @@ const AppRoutes = () => {
           <PrivateRoute>
             <Calendar />
           </PrivateRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <Admin />
+          </AdminRoute>
         }
       />
 
