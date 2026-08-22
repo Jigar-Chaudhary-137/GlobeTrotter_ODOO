@@ -45,8 +45,9 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`=================================`);
-  console.log(`GlobeTrotter Server running on port ${PORT}`);
-  console.log(`Health Check: http://localhost:${PORT}/api/health`);
+  console.log(`GlobeTrotter Backend API:  http://localhost:${PORT}`);
+  console.log(`GlobeTrotter Frontend App: http://localhost:5173`);
+  console.log(`API Health Check:          http://localhost:${PORT}/api/health`);
   console.log(`=================================`);
 });
 
