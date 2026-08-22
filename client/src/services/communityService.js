@@ -9,5 +9,10 @@ export const communityService = {
   getPublicTripById: async (shareId) => {
     const response = await api.get(`/public/trips/${shareId}`);
     return response.data;
+  },
+
+  toggleLike: async (tripId) => {
+    const response = await api.post(`/community/${tripId}/like`);
+    return response.data;
   }
 };

@@ -13,7 +13,6 @@ import {
   Copy, 
   ExternalLink, 
   Heart,
-  TrendingUp,
   Wallet,
   AlertCircle
 } from 'lucide-react';
@@ -22,12 +21,13 @@ import Loader, { CardSkeleton } from '../components/ui/Loader';
 export default function Community() {
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const { isDemoMode } = useAuth();
+  const { user, isDemoMode } = useAuth();
 
   const [posts, setPosts] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [copyingId, setCopyingId] = useState(null);
+  const [likingIds, setLikingIds] = useState(new Set());
 
   // Fetch community public trips
   const fetchCommunityTrips = async () => {
@@ -38,8 +38,9 @@ export default function Community() {
         return;
       }
 
-      const data = await communityService.getPublicTrips();
-      setPosts(Array.isArray(data) ? data : data.posts || data.trips || []);
+      const response = await communityService.getPublicTrips();
+      const tripsData = Array.isArray(response) ? response : (response.data || response.posts || response.trips || []);
+      setPosts(tripsData);
     } catch (err) {
       console.warn("Failed to fetch community trips from API, falling back to mock posts:", err);
       setPosts(MOCK_COMMUNITY_TRIPS);
@@ -53,20 +54,24 @@ export default function Community() {
   }, [isDemoMode]);
 
   // Copy trip action
-  const handleCopyTrip = async (e, tripId, tripName) => {
+  const handleCopyTrip = async (e, shareIdOrId, tripTitle) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (!user && !isDemoMode) {
+      addToast("Please log in to copy this trip to your account.", "info");
+      navigate('/login');
+      return;
+    }
     
-    setCopyingId(tripId);
+    setCopyingId(shareIdOrId);
     try {
       if (isDemoMode) {
-        // Find in mock data
-        const sourceTrip = MOCK_COMMUNITY_TRIPS.find(t => t.id === tripId);
+        const sourceTrip = MOCK_COMMUNITY_TRIPS.find(t => (t.shareId || t.id) === shareIdOrId) || MOCK_COMMUNITY_TRIPS[0];
         
-        // Form a new copied trip payload
         const newCopiedTrip = {
           id: `trip-copied-${Date.now()}`,
-          name: `Copy of: ${tripName}`,
+          name: `Copy of: ${tripTitle}`,
           startDate: sourceTrip?.startDate || '2026-06-01',
           endDate: sourceTrip?.endDate || '2026-06-10',
           budget: sourceTrip?.budget || 2000,
@@ -77,7 +82,7 @@ export default function Community() {
             country: s.country || 'Unknown',
             arrivalDate: '2026-06-01',
             departureDate: '2026-06-05',
-            durationDays: s.durationDays,
+            durationDays: s.durationDays || 4,
             order: idx
           })) || [],
           itinerary: [],
@@ -86,51 +91,86 @@ export default function Community() {
 
         const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
         localStorage.setItem('demo_trips', JSON.stringify([...demoTrips, newCopiedTrip]));
-        addToast(`Successfully duplicated: ${tripName}!`, 'success');
+        addToast(`Successfully duplicated: ${tripTitle}!`, 'success');
         navigate(`/trips/${newCopiedTrip.id}`);
       } else {
-        const response = await tripService.copyTrip(tripId);
-        addToast(`Successfully duplicated: ${tripName}!`, 'success');
-        navigate(`/trips/${response.trip?.id || response.id}`);
+        const response = await tripService.copyTrip(shareIdOrId);
+        const copiedTrip = response.data || response.trip || response;
+        addToast(`Successfully duplicated: ${tripTitle}!`, 'success');
+        navigate(`/trips/${copiedTrip.id}`);
       }
     } catch (err) {
       console.error("Failed to copy trip:", err);
-      // Fallback
-      const sourceTrip = MOCK_COMMUNITY_TRIPS.find(t => t.id === tripId);
-      const newCopiedTrip = {
-        id: `trip-copied-${Date.now()}`,
-        name: `Copy of: ${tripName}`,
-        startDate: sourceTrip?.startDate || '2026-06-01',
-        endDate: sourceTrip?.endDate || '2026-06-10',
-        budget: sourceTrip?.budget || 2000,
-        isPublic: false,
-        stops: sourceTrip?.stops?.map((s, idx) => ({
-          id: `stop-${Date.now()}-${idx}`,
-          city: s.city,
-          country: s.country || 'Unknown',
-          arrivalDate: '2026-06-01',
-          departureDate: '2026-06-05',
-          durationDays: s.durationDays,
-          order: idx
-        })) || [],
-        itinerary: [],
-        expenses: []
-      };
-      const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-      localStorage.setItem('demo_trips', JSON.stringify([...demoTrips, newCopiedTrip]));
-      
-      addToast(`Successfully duplicated (Offline Demo Mode): ${tripName}!`, 'success');
-      navigate(`/trips/${newCopiedTrip.id}`);
+      addToast("Failed to copy trip. Please try again.", "error");
     } finally {
       setCopyingId(null);
+    }
+  };
+
+  // Toggle Like action
+  const handleLikeTrip = async (e, tripId) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user && !isDemoMode) {
+      addToast("Please log in to like community trips.", "info");
+      navigate('/login');
+      return;
+    }
+
+    if (likingIds.has(tripId)) return; // Prevent duplicate requests
+    setLikingIds(prev => new Set(prev).add(tripId));
+
+    try {
+      if (isDemoMode) {
+        setPosts(prev => prev.map(p => {
+          if (p.id === tripId) {
+            const currentlyLiked = p.isLiked;
+            const currentCount = p.likeCount ?? p.likes ?? 0;
+            return {
+              ...p,
+              isLiked: !currentlyLiked,
+              likeCount: currentlyLiked ? Math.max(0, currentCount - 1) : currentCount + 1,
+              likes: currentlyLiked ? Math.max(0, currentCount - 1) : currentCount + 1
+            };
+          }
+          return p;
+        }));
+      } else {
+        const res = await communityService.toggleLike(tripId);
+        const isLikedNow = res.data?.liked;
+        setPosts(prev => prev.map(p => {
+          if (p.id === tripId) {
+            const prevCount = p.likeCount ?? p.likes ?? 0;
+            return {
+              ...p,
+              isLiked: isLikedNow,
+              likeCount: isLikedNow ? prevCount + 1 : Math.max(0, prevCount - 1),
+              likes: isLikedNow ? prevCount + 1 : Math.max(0, prevCount - 1)
+            };
+          }
+          return p;
+        }));
+        addToast(isLikedNow ? 'Liked trip!' : 'Unliked trip', 'success');
+      }
+    } catch (err) {
+      console.error("Failed to toggle like:", err);
+      addToast("Failed to update like status.", "error");
+    } finally {
+      setLikingIds(prev => {
+        const next = new Set(prev);
+        next.delete(tripId);
+        return next;
+      });
     }
   };
 
   // Filter posts based on search query
   const filteredPosts = posts.filter(post => {
     const query = searchQuery.toLowerCase();
-    const matchesTitle = post.name.toLowerCase().includes(query);
-    const matchesStops = post.stops?.some(s => s.city.toLowerCase().includes(query));
+    const title = (post.title || post.name || '').toLowerCase();
+    const matchesTitle = title.includes(query);
+    const matchesStops = post.stops?.some(s => (s.city || '').toLowerCase().includes(query));
     return matchesTitle || matchesStops;
   });
 
@@ -173,93 +213,116 @@ export default function Community() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredPosts.map((post) => (
-            <div 
-              key={post.id}
-              className="bg-white border border-stone-200 rounded-2xl overflow-hidden hover:shadow-md transition-all duration-200 flex flex-col justify-between group"
-            >
-              <div className="p-6 space-y-4">
-                {/* User card header */}
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={post.user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'} 
-                    alt={post.user?.name}
-                    className="w-10 h-10 rounded-full border border-stone-200 object-cover shrink-0"
-                  />
+          {filteredPosts.map((post) => {
+            const tripTitle = post.title || post.name || 'Untitled Journey';
+            const tripBudget = post.totalBudget ?? post.budget ?? post.estimatedCost ?? 0;
+            const tripLikes = post.likeCount ?? post.likes ?? 0;
+            const userName = post.user?.name || 'Explorer';
+            const userAvatar = post.user?.profilePic || post.user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80';
+            const userLocation = post.user?.city ? `${post.user.city}${post.user.country ? `, ${post.user.country}` : ''}` : (post.user?.location || 'GlobeTrotter Member');
+            const targetShareId = post.shareId || post.id;
+            const isLiked = Boolean(post.isLiked);
+
+            return (
+              <div 
+                key={post.id}
+                className="bg-white border border-stone-200 rounded-2xl overflow-hidden hover:shadow-md transition-all duration-200 flex flex-col justify-between group"
+              >
+                <div className="p-6 space-y-4">
+                  {/* User card header */}
+                  <div className="flex items-center gap-3">
+                    <img 
+                      src={userAvatar} 
+                      alt={userName}
+                      className="w-10 h-10 rounded-full border border-stone-200 object-cover shrink-0"
+                    />
+                    <div>
+                      <div className="font-bold text-stone-900 text-sm leading-tight">{userName}</div>
+                      <div className="text-xs text-text-muted mt-0.5">{userLocation}</div>
+                    </div>
+                  </div>
+
+                  {/* Trip name & description */}
                   <div>
-                    <div className="font-bold text-stone-900 text-sm leading-tight">{post.user?.name}</div>
-                    <div className="text-xs text-text-muted mt-0.5">{post.user?.location || 'GlobeTrotter User'}</div>
+                    <h3 className="font-display font-bold text-lg text-text-dark group-hover:text-primary transition-colors leading-tight">
+                      {tripTitle}
+                    </h3>
+                    <p className="text-xs text-text-muted mt-1.5 leading-relaxed line-clamp-2">
+                      {post.description || 'Check out my custom travel itinerary, daily stops, and budget estimations.'}
+                    </p>
                   </div>
-                </div>
 
-                {/* Trip name & description */}
-                <div>
-                  <h3 className="font-display font-bold text-lg text-text-dark group-hover:text-primary transition-colors leading-tight">
-                    {post.name}
-                  </h3>
-                  <p className="text-xs text-text-muted mt-1.5 leading-relaxed line-clamp-2">
-                    {post.description || 'Check out my custom travel itinerary, daily stops, and budget estimations.'}
-                  </p>
-                </div>
-
-                {/* Info Pills */}
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 px-2.5 py-1 rounded-lg text-stone-600 font-semibold">
-                    <Calendar className="w-3.5 h-3.5 text-stone-400" />
-                    {post.stops?.reduce((sum, s) => sum + s.durationDays, 0) || 5} Days
+                  {/* Info Pills */}
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 px-2.5 py-1 rounded-lg text-stone-600 font-semibold">
+                      <Calendar className="w-3.5 h-3.5 text-stone-400" />
+                      {post.stops?.reduce((sum, s) => sum + (s.durationDays || 1), 0) || (post.itemCount || 5)} Days
+                    </div>
+                    <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 px-2.5 py-1 rounded-lg text-stone-600 font-semibold">
+                      <Wallet className="w-3.5 h-3.5 text-stone-400" />
+                      Est. ${tripBudget}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 px-2.5 py-1 rounded-lg text-stone-600 font-semibold">
-                    <Wallet className="w-3.5 h-3.5 text-stone-400" />
-                    Est. ${post.budget || post.estimatedCost}
-                  </div>
-                </div>
 
-                {/* Stop badges */}
-                <div className="flex items-center gap-1.5 flex-wrap pt-2">
-                  <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Stops:</span>
-                  {post.stops?.map((stop, i) => (
-                    <span 
-                      key={i}
-                      className="inline-flex items-center gap-0.5 text-xs bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-md"
-                    >
-                      <MapPin className="w-3 h-3" />
-                      {stop.city}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action Buttons footer */}
-              <div className="bg-stone-50/50 border-t border-stone-200/80 px-6 py-4 flex items-center justify-between gap-4">
-                <span className="flex items-center gap-1 text-xs text-rose-500 font-bold">
-                  <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
-                  {post.likes || 12} Likes
-                </span>
-                
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => navigate(`/public/trips/${post.id}`)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 border border-stone-200 bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs rounded-lg transition-colors"
-                  >
-                    View Plan
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={(e) => handleCopyTrip(e, post.id, post.name)}
-                    disabled={copyingId === post.id}
-                    className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    {copyingId === post.id ? 'Duplicating...' : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        Copy Trip
-                      </>
+                  {/* Stop badges */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-2">
+                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Stops:</span>
+                    {post.stops && post.stops.length > 0 ? (
+                      post.stops.map((stop, i) => (
+                        <span 
+                          key={i}
+                          className="inline-flex items-center gap-0.5 text-xs bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-md"
+                        >
+                          <MapPin className="w-3 h-3" />
+                          {stop.city}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-text-muted italic">Multi-city stops</span>
                     )}
+                  </div>
+                </div>
+
+                {/* Action Buttons footer */}
+                <div className="bg-stone-50/50 border-t border-stone-200/80 px-6 py-4 flex items-center justify-between gap-4">
+                  <button
+                    onClick={(e) => handleLikeTrip(e, post.id)}
+                    disabled={likingIds.has(post.id)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-bold transition-all ${
+                      isLiked 
+                        ? 'bg-rose-50 text-rose-600 border-rose-200' 
+                        : 'bg-white hover:bg-stone-100 text-stone-600 border-stone-200'
+                    }`}
+                  >
+                    <Heart className={`w-4 h-4 ${isLiked ? 'fill-rose-500 text-rose-500' : 'text-stone-400'}`} />
+                    {tripLikes} {tripLikes === 1 ? 'Like' : 'Likes'}
                   </button>
+                  
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => navigate(`/public/trips/${targetShareId}`)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 border border-stone-200 bg-white hover:bg-stone-100 text-stone-700 font-bold text-xs rounded-lg transition-colors"
+                    >
+                      View Plan
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => handleCopyTrip(e, targetShareId, tripTitle)}
+                      disabled={copyingId === targetShareId}
+                      className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-primary hover:bg-primary-hover text-white font-bold text-xs rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {copyingId === targetShareId ? 'Duplicating...' : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          Copy Trip
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

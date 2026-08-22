@@ -61,12 +61,12 @@ export const tripService = {
 
   // Public operations
   publishTrip: async (tripId, isPublic = true) => {
-    const response = await api.put(`/trips/${tripId}`, { isPublic });
+    const response = await api.post(`/trips/${tripId}/publish`);
     return response.data;
   },
 
-  copyTrip: async (tripId) => {
-    const response = await api.post(`/trips/${tripId}/copy`);
+  copyTrip: async (shareId) => {
+    const response = await api.post(`/public/trips/${shareId}/copy`);
     return response.data;
   }
 };

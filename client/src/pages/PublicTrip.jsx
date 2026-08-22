@@ -12,21 +12,16 @@ import {
   Copy, 
   Heart,
   Globe,
-  Clock,
-  ArrowRight,
-  PlaneTakeoff,
-  TrendingUp,
-  UserCheck
+  PlaneTakeoff
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
   PieChart, 
   Pie, 
   Cell, 
-  Tooltip, 
-  Legend 
+  Tooltip
 } from 'recharts';
-import Loader, { ListSkeleton } from '../components/ui/Loader';
+import Loader from '../components/ui/Loader';
 
 const CATEGORIES = ['Transport', 'Accommodation', 'Activities', 'Meals', 'Other'];
 const COLORS = ['#0d9488', '#f97316', '#3b82f6', '#ec4899', '#8b5cf6'];
@@ -40,32 +35,36 @@ export default function PublicTrip() {
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copying, setCopying] = useState(false);
-  const [likes, setLikes] = useState(24);
+  const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
+  const [liking, setLiking] = useState(false);
 
   // Fetch shared trip details
   const fetchSharedTrip = async () => {
     try {
       if (isDemoMode) {
-        // Look in local cache or fallback
         const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-        let found = demoTrips.find(t => t.id === shareId);
-        if (!found) found = MOCK_TRIPS.find(t => t.id === shareId);
+        let found = demoTrips.find(t => t.id === shareId || t.shareId === shareId);
+        if (!found) found = MOCK_TRIPS.find(t => t.id === shareId || t.shareId === shareId);
         
         setTrip(found);
+        setLikes(found?.likes || 24);
         setLoading(false);
         return;
       }
 
       const response = await communityService.getPublicTripById(shareId);
-      setTrip(response.trip || response);
+      const tripData = response.data || response.trip || response;
+      setTrip(tripData);
+      setLikes(tripData._count?.communityLikes ?? tripData.likes ?? 0);
+      setLiked(Boolean(tripData.isLiked));
     } catch (err) {
       console.warn("Public trip API failed, searching local fallback:", err);
-      // Fallback
       const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-      let found = demoTrips.find(t => t.id === shareId);
-      if (!found) found = MOCK_TRIPS.find(t => t.id === shareId);
+      let found = demoTrips.find(t => t.id === shareId || t.shareId === shareId);
+      if (!found) found = MOCK_TRIPS.find(t => t.id === shareId || t.shareId === shareId);
       setTrip(found);
+      setLikes(found?.likes || 24);
     } finally {
       setLoading(false);
     }
@@ -77,7 +76,7 @@ export default function PublicTrip() {
 
   // Copy trip action
   const handleCopyTrip = async () => {
-    if (!user) {
+    if (!user && !isDemoMode) {
       addToast("Please log in to copy this trip to your account.", "info");
       navigate('/login');
       return;
@@ -86,17 +85,16 @@ export default function PublicTrip() {
     setCopying(true);
     try {
       if (isDemoMode) {
-        // Mock copy
         const newCopiedTrip = {
           id: `trip-copied-${Date.now()}`,
-          name: `Copy of: ${trip.name}`,
+          name: `Copy of: ${trip.title || trip.name}`,
           startDate: trip.startDate,
           endDate: trip.endDate,
-          budget: trip.budget,
+          budget: trip.totalBudget || trip.budget,
           isPublic: false,
           stops: trip.stops?.map((s, idx) => ({ ...s, id: `stop-${Date.now()}-${idx}` })) || [],
-          itinerary: trip.itinerary?.map((i, idx) => ({ ...i, id: `item-${Date.now()}-${idx}` })) || [],
-          expenses: trip.expenses?.map((e, idx) => ({ ...e, id: `exp-${Date.now()}-${idx}` })) || []
+          itinerary: trip.itineraryItems || trip.itinerary || [],
+          expenses: trip.expenses || []
         };
 
         const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
@@ -104,56 +102,64 @@ export default function PublicTrip() {
         addToast("Trip copied successfully to your dashboard!", "success");
         navigate(`/trips/${newCopiedTrip.id}`);
       } else {
-        const response = await tripService.copyTrip(trip.id);
+        const targetShareId = trip?.shareId || shareId;
+        const response = await tripService.copyTrip(targetShareId);
+        const copiedTrip = response.data || response.trip || response;
         addToast("Trip copied successfully to your dashboard!", "success");
-        navigate(`/trips/${response.trip?.id || response.id}`);
+        navigate(`/trips/${copiedTrip.id}`);
       }
     } catch (err) {
       console.error("Failed to copy trip:", err);
-      // Fallback
-      const newCopiedTrip = {
-        id: `trip-copied-${Date.now()}`,
-        name: `Copy of: ${trip.name}`,
-        startDate: trip.startDate,
-        endDate: trip.endDate,
-        budget: trip.budget,
-        isPublic: false,
-        stops: trip.stops?.map((s, idx) => ({ ...s, id: `stop-${Date.now()}-${idx}` })) || [],
-        itinerary: trip.itinerary?.map((i, idx) => ({ ...i, id: `item-${Date.now()}-${idx}` })) || [],
-        expenses: trip.expenses?.map((e, idx) => ({ ...e, id: `exp-${Date.now()}-${idx}` })) || []
-      };
-      const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
-      localStorage.setItem('demo_trips', JSON.stringify([...demoTrips, newCopiedTrip]));
-      
-      addToast("Trip copied successfully (Offline Demo Mode)!", "success");
-      navigate(`/trips/${newCopiedTrip.id}`);
+      addToast("Failed to copy trip. Please try again.", "error");
     } finally {
       setCopying(false);
     }
   };
 
-  const handleLike = () => {
-    if (liked) {
-      setLikes(likes - 1);
-      setLiked(false);
-    } else {
-      setLikes(likes + 1);
-      setLiked(true);
-      addToast("Thanks for supporting!", "success");
+  // Toggle Like action
+  const handleLike = async () => {
+    if (!user && !isDemoMode) {
+      addToast("Please log in to support and like trips.", "info");
+      navigate('/login');
+      return;
+    }
+
+    if (!trip || liking) return;
+    setLiking(true);
+
+    try {
+      if (isDemoMode) {
+        setLiked(prev => !prev);
+        setLikes(prev => (liked ? Math.max(0, prev - 1) : prev + 1));
+      } else {
+        const res = await communityService.toggleLike(trip.id);
+        const isLikedNow = res.data?.liked;
+        setLiked(isLikedNow);
+        setLikes(prev => (isLikedNow ? prev + 1 : Math.max(0, prev - 1)));
+        addToast(isLikedNow ? "Thanks for supporting!" : "Unliked trip", "success");
+      }
+    } catch (err) {
+      console.error("Failed to toggle like:", err);
+      addToast("Failed to update like status.", "error");
+    } finally {
+      setLiking(false);
     }
   };
 
   // Generate itinerary days
   const getTripDays = () => {
-    if (!trip) return [];
+    if (!trip || !trip.startDate || !trip.endDate) return [];
     const start = new Date(trip.startDate);
     const end = new Date(trip.endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
+    
     const days = [];
     let current = new Date(start);
 
     while (current <= end) {
       const dateString = current.toISOString().split('T')[0];
       const activeStop = trip.stops?.find(s => {
+        if (!s.arrivalDate || !s.departureDate) return false;
         const stopStart = new Date(s.arrivalDate);
         const stopEnd = new Date(s.departureDate);
         return current >= stopStart && current <= stopEnd;
@@ -175,17 +181,20 @@ export default function PublicTrip() {
     const groups = {};
     CATEGORIES.forEach(cat => { groups[cat] = 0; });
 
-    (trip.itinerary || []).forEach(item => {
+    const items = trip.itineraryItems || trip.itinerary || [];
+    items.forEach(item => {
       const cat = item.category === 'Culture/Museums' || item.category === 'Attractions' ? 'Activities' :
                  item.category === 'Food/Restaurants' ? 'Meals' : item.category;
-      if (groups[cat] !== undefined) groups[cat] += (item.cost || 0);
-      else groups['Other'] += (item.cost || 0);
+      const amount = item.expense || item.cost || 0;
+      if (groups[cat] !== undefined) groups[cat] += amount;
+      else groups['Other'] += amount;
     });
 
     (trip.expenses || []).forEach(exp => {
       const cat = exp.category;
-      if (groups[cat] !== undefined) groups[cat] += (exp.amount || 0);
-      else groups['Other'] += (exp.amount || 0);
+      const amount = exp.amount || 0;
+      if (groups[cat] !== undefined) groups[cat] += amount;
+      else groups['Other'] += amount;
     });
 
     return Object.keys(groups)
@@ -195,7 +204,8 @@ export default function PublicTrip() {
 
   const expenseSum = () => {
     if (!trip) return 0;
-    const itSum = (trip.itinerary || []).reduce((sum, item) => sum + (item.cost || 0), 0);
+    const items = trip.itineraryItems || trip.itinerary || [];
+    const itSum = items.reduce((sum, item) => sum + (item.expense || item.cost || 0), 0);
     const exSum = (trip.expenses || []).reduce((sum, exp) => sum + (exp.amount || 0), 0);
     return itSum + exSum;
   };
@@ -213,7 +223,7 @@ export default function PublicTrip() {
     return (
       <div className="min-h-screen bg-bg-warm flex flex-col items-center justify-center p-8">
         <div className="text-center py-6">
-          <p className="text-text-muted text-sm font-semibold">Shared trip could not be found.</p>
+          <p className="text-text-muted text-sm font-semibold">Shared trip could not be found or link is private.</p>
           <Link to="/dashboard" className="text-primary hover:underline text-sm font-bold mt-4 inline-block">
             Go to Dashboard
           </Link>
@@ -222,13 +232,17 @@ export default function PublicTrip() {
     );
   }
 
+  const tripTitle = trip.title || trip.name || 'Shared Trip';
+  const tripBudget = trip.totalBudget ?? trip.budget ?? 0;
   const tripDays = getTripDays();
   const totalCost = expenseSum();
   const chartData = getChartData();
+  const userName = trip.user?.name || 'GlobeTrotter Explorer';
+  const userAvatar = trip.user?.profilePic || trip.user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80';
 
   return (
     <div className="min-h-screen bg-bg-warm font-sans text-sm flex flex-col">
-      {/* Top Static Header */}
+      {/* Top Header */}
       <header className="h-16 bg-surface border-b border-stone-200 flex items-center justify-between px-6 sticky top-0 z-40">
         <Link to="/dashboard" className="flex items-center gap-2">
           <PlaneTakeoff className="w-5 h-5 text-primary" />
@@ -254,27 +268,36 @@ export default function PublicTrip() {
           
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-100 uppercase tracking-wide">
                   <Globe className="w-3 h-3" />
                   Public Share
                 </span>
                 <span className="text-stone-300">•</span>
-                <span className="text-xs text-text-muted font-bold">Creator: {trip.user?.name || 'Explorer'}</span>
+                <div className="flex items-center gap-2">
+                  <img src={userAvatar} alt={userName} className="w-5 h-5 rounded-full border border-stone-200 object-cover" />
+                  <span className="text-xs text-text-muted font-bold">Creator: {userName}</span>
+                </div>
               </div>
               <h1 className="font-display font-extrabold text-2xl md:text-3xl text-text-dark tracking-tight leading-none">
-                {trip.name}
+                {tripTitle}
               </h1>
               <div className="flex flex-wrap gap-y-1.5 gap-x-4 items-center text-xs text-text-muted font-semibold">
-                <span className="flex items-center gap-1">
-                  <CalendarIcon className="w-3.5 h-3.5" />
-                  {trip.startDate} to {trip.endDate}
-                </span>
-                <span className="text-stone-300">•</span>
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5" />
-                  {trip.stops?.map(s => s.city).join(' → ')}
-                </span>
+                {trip.startDate && (
+                  <span className="flex items-center gap-1">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                    {new Date(trip.startDate).toLocaleDateString()} {trip.endDate ? `to ${new Date(trip.endDate).toLocaleDateString()}` : ''}
+                  </span>
+                )}
+                {trip.stops && trip.stops.length > 0 && (
+                  <>
+                    <span className="text-stone-300">•</span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      {trip.stops.map(s => s.city).join(' → ')}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -282,6 +305,7 @@ export default function PublicTrip() {
             <div className="flex gap-2.5 items-center shrink-0">
               <button
                 onClick={handleLike}
+                disabled={liking}
                 className={`inline-flex items-center gap-1.5 px-4 py-2 border rounded-xl text-xs font-bold transition-all ${
                   liked 
                     ? 'bg-rose-50 text-rose-700 border-rose-200' 
@@ -289,7 +313,7 @@ export default function PublicTrip() {
                 }`}
               >
                 <Heart className={`w-4 h-4 ${liked ? 'fill-rose-500 text-rose-500' : ''}`} />
-                {likes} Likes
+                {likes} {likes === 1 ? 'Like' : 'Likes'}
               </button>
 
               <button
@@ -311,56 +335,66 @@ export default function PublicTrip() {
             <h2 className="font-display font-bold text-lg text-text-dark border-b border-stone-200 pb-3">Itinerary Details</h2>
             
             <div className="space-y-6">
-              {tripDays.map((day, idx) => {
-                const dayActivities = (trip.itinerary || []).filter(item => item.date === day.date);
+              {tripDays.length > 0 ? (
+                tripDays.map((day, idx) => {
+                  const items = trip.itineraryItems || trip.itinerary || [];
+                  const dayActivities = items.filter(item => {
+                    if (!item.date) return item.dayNumber === (idx + 1);
+                    return new Date(item.date).toISOString().split('T')[0] === day.date;
+                  });
 
-                return (
-                  <div key={day.date} className="flex gap-4">
-                    {/* Minimal Day marker */}
-                    <div className="w-20 shrink-0 text-right">
-                      <div className="text-xs font-extrabold text-primary uppercase">Day {idx + 1}</div>
-                      <div className="text-[11px] font-bold text-stone-500 mt-0.5 truncate">{day.label}</div>
-                      {day.stop && (
-                        <div className="text-[10px] font-semibold text-text-muted mt-1 truncate">{day.stop.city}</div>
-                      )}
-                    </div>
+                  return (
+                    <div key={day.date} className="flex gap-4">
+                      {/* Minimal Day marker */}
+                      <div className="w-20 shrink-0 text-right">
+                        <div className="text-xs font-extrabold text-primary uppercase">Day {idx + 1}</div>
+                        <div className="text-[11px] font-bold text-stone-500 mt-0.5 truncate">{day.label}</div>
+                        {day.stop && (
+                          <div className="text-[10px] font-semibold text-text-muted mt-1 truncate">{day.stop.city}</div>
+                        )}
+                      </div>
 
-                    <div className="w-0.5 bg-stone-200 shrink-0 relative">
-                      <div className="absolute top-1.5 -left-1 w-2.5 h-2.5 rounded-full bg-primary/20 border-2 border-primary" />
-                    </div>
+                      <div className="w-0.5 bg-stone-200 shrink-0 relative">
+                        <div className="absolute top-1.5 -left-1 w-2.5 h-2.5 rounded-full bg-primary/20 border-2 border-primary" />
+                      </div>
 
-                    {/* Day activities list */}
-                    <div className="flex-1 space-y-2">
-                      {dayActivities.length === 0 ? (
-                        <p className="text-xs text-text-muted italic py-1 pl-2">No planned activities.</p>
-                      ) : (
-                        dayActivities.map(act => (
-                          <div 
-                            key={act.id} 
-                            className="bg-white border border-stone-200 p-3.5 rounded-xl flex items-center justify-between gap-4"
-                          >
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="font-bold text-stone-900 text-xs">{act.time}</span>
-                                <span className="font-semibold text-text-dark text-xs">{act.activityName}</span>
-                                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-stone-50 border border-stone-100 text-stone-600 uppercase">
-                                  {act.category}
-                                </span>
+                      {/* Day activities list */}
+                      <div className="flex-1 space-y-2">
+                        {dayActivities.length === 0 ? (
+                          <p className="text-xs text-text-muted italic py-1 pl-2">No planned activities for this date.</p>
+                        ) : (
+                          dayActivities.map(act => (
+                            <div 
+                              key={act.id} 
+                              className="bg-white border border-stone-200 p-3.5 rounded-xl flex items-center justify-between gap-4"
+                            >
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-stone-900 text-xs">{act.time || '09:00'}</span>
+                                  <span className="font-semibold text-text-dark text-xs">{act.title || act.activityName}</span>
+                                  <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-stone-50 border border-stone-100 text-stone-600 uppercase">
+                                    {act.category}
+                                  </span>
+                                </div>
+                                {(act.description || act.notes) && (
+                                  <p className="text-xs text-text-muted italic mt-1 leading-relaxed">{act.description || act.notes}</p>
+                                )}
                               </div>
-                              {act.notes && (
-                                <p className="text-xs text-text-muted italic mt-1 leading-relaxed">{act.notes}</p>
-                              )}
+                              <span className="font-bold text-xs text-emerald-600 shrink-0">
+                                {(act.expense || act.cost) > 0 ? `$${act.expense || act.cost}` : 'Free'}
+                              </span>
                             </div>
-                            <span className="font-bold text-xs text-emerald-600 shrink-0">
-                              {act.cost > 0 ? `$${act.cost}` : 'Free'}
-                            </span>
-                          </div>
-                        ))
-                      )}
+                          ))
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <div className="bg-white border border-stone-200 p-6 rounded-2xl text-center">
+                  <p className="text-text-muted text-xs font-semibold">No day-wise itinerary items created yet.</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -373,11 +407,11 @@ export default function PublicTrip() {
               <div className="grid grid-cols-2 gap-4 border-b border-stone-100 pb-4">
                 <div>
                   <span className="text-xs text-text-muted block font-medium">Estimated Budget</span>
-                  <span className="font-bold text-lg text-text-dark">${trip.budget.toLocaleString()}</span>
+                  <span className="font-bold text-lg text-text-dark">${tripBudget.toLocaleString()}</span>
                 </div>
                 <div>
                   <span className="text-xs text-text-muted block font-medium">Accumulated Expenses</span>
-                  <span className={`font-bold text-lg ${totalCost > trip.budget ? 'text-rose-600' : 'text-emerald-600'}`}>
+                  <span className={`font-bold text-lg ${totalCost > tripBudget && tripBudget > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                     ${totalCost.toLocaleString()}
                   </span>
                 </div>
@@ -405,26 +439,34 @@ export default function PublicTrip() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <p className="text-text-muted text-xs italic text-center py-4">No budget graphs mapping.</p>
+                <p className="text-text-muted text-xs italic text-center py-4">No expense breakdown recorded.</p>
               )}
             </div>
 
             {/* Route Stops Recap */}
             <div className="bg-white border border-stone-200 p-6 rounded-3xl space-y-4">
               <h3 className="font-display font-bold text-base text-text-dark">Route Summary</h3>
-              <div className="space-y-3">
-                {trip.stops?.map((stop, sIdx) => (
-                  <div key={stop.id || sIdx} className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-md bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
-                      {sIdx + 1}
+              {trip.stops && trip.stops.length > 0 ? (
+                <div className="space-y-3">
+                  {trip.stops.map((stop, sIdx) => (
+                    <div key={stop.id || sIdx} className="flex items-center gap-3">
+                      <div className="w-5 h-5 rounded-md bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+                        {sIdx + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-stone-900 text-xs truncate">{stop.city}{stop.country ? `, ${stop.country}` : ''}</div>
+                        {stop.arrivalDate && stop.departureDate && (
+                          <div className="text-[10px] text-text-muted mt-0.5">
+                            {new Date(stop.arrivalDate).toLocaleDateString()} - {new Date(stop.departureDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-stone-900 text-xs truncate">{stop.city}, {stop.country}</div>
-                      <div className="text-[10px] text-text-muted mt-0.5">{stop.durationDays} days stay</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-text-muted text-xs italic">No route stops recorded.</p>
+              )}
             </div>
           </div>
         </div>
