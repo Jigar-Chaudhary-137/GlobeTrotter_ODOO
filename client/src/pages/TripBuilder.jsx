@@ -4,35 +4,35 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { tripService } from '../services/tripService';
 import { MOCK_TRIPS } from '../utils/mockData';
-import { 
-  Calendar as CalendarIcon, 
-  MapPin, 
-  Wallet, 
-  Plus, 
-  Trash2, 
-  Edit3, 
-  Share2, 
-  Check, 
-  Copy, 
+import {
+  Calendar as CalendarIcon,
+  MapPin,
+  Wallet,
+  Plus,
+  Trash2,
+  Edit3,
+  Share2,
+  Check,
+  Copy,
   AlertTriangle,
-  PieChart as ChartIcon, 
-  Clock, 
-  Layers, 
+  PieChart as ChartIcon,
+  Clock,
+  Layers,
   Activity,
   UserCheck,
   Globe
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  Tooltip, 
-  Legend, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis 
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis
 } from 'recharts';
 import Loader, { ListSkeleton } from '../components/ui/Loader';
 import Modal from '../components/ui/Modal';
@@ -53,7 +53,7 @@ export default function TripBuilder() {
   // Modals state
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
-  
+
   // Form states for Itinerary Item Add/Edit
   const [editingItem, setEditingItem] = useState(null);
   const [activityName, setActivityName] = useState('');
@@ -70,6 +70,107 @@ export default function TripBuilder() {
   const [expenseDesc, setExpenseDesc] = useState('');
   const [savingExpense, setSavingExpense] = useState(false);
 
+  // Screen 5 itinerary sections states & handlers
+  const [sections, setSections] = useState([]);
+  const [savingSections, setSavingSections] = useState(false);
+
+  useEffect(() => {
+    if (trip) {
+      if (trip.sections && trip.sections.length > 0) {
+        setSections(trip.sections);
+      } else {
+        const defaultSections = [
+          {
+            id: `sec-1-${Date.now()}`,
+            title: 'Section 1: Exploration & Sightseeing',
+            description: 'Sightseeing of landmarks, monuments, and main museums.',
+            startDate: trip.startDate,
+            endDate: trip.startDate,
+            budget: Math.round(trip.budget * 0.4)
+          },
+          {
+            id: `sec-2-${Date.now()}`,
+            title: 'Section 2: Cultural Experience & Dining',
+            description: 'Local culinary tasting, market visits, and historic quarter walks.',
+            startDate: trip.startDate,
+            endDate: trip.endDate,
+            budget: Math.round(trip.budget * 0.3)
+          },
+          {
+            id: `sec-3-${Date.now()}`,
+            title: 'Section 3: Leisure & Evening Shows',
+            description: 'Relaxation at parks, dinner cruises, or theatre performances.',
+            startDate: trip.endDate,
+            endDate: trip.endDate,
+            budget: Math.round(trip.budget * 0.3)
+          }
+        ];
+        setSections(defaultSections);
+      }
+    }
+  }, [trip]);
+
+  const handleUpdateSection = (sectionId, field, value) => {
+    setSections(sections.map(sec => {
+      if (sec.id === sectionId) {
+        return { ...sec, [field]: value };
+      }
+      return sec;
+    }));
+  };
+
+  const handleAddSection = () => {
+    const newNum = sections.length + 1;
+    const newSection = {
+      id: `sec-${Date.now()}-${newNum}`,
+      title: `Section ${newNum}`,
+      description: '',
+      startDate: trip?.startDate || '',
+      endDate: trip?.endDate || '',
+      budget: 0
+    };
+    setSections([...sections, newSection]);
+    addToast(`Added Section ${newNum}`, 'success');
+  };
+
+  const handleDeleteSection = (sectionId) => {
+    setSections(sections.filter(sec => sec.id !== sectionId));
+    addToast('Section removed', 'info');
+  };
+
+  const handleSaveSections = async () => {
+    setSavingSections(true);
+    const updatedTrip = { ...trip, sections };
+    try {
+      if (isDemoMode) {
+        const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
+        const idx = demoTrips.findIndex(t => t.id === id);
+        if (idx !== -1) {
+          demoTrips[idx] = updatedTrip;
+          localStorage.setItem('demo_trips', JSON.stringify(demoTrips));
+        }
+        setTrip(updatedTrip);
+        addToast('Itinerary sections saved (Demo Mode)!', 'success');
+      } else {
+        await tripService.updateTrip(id, { sections });
+        setTrip(updatedTrip);
+        addToast('Itinerary sections saved successfully!', 'success');
+      }
+    } catch (err) {
+      console.warn("Failed to save sections to API, fallback to local save:", err);
+      const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
+      const idx = demoTrips.findIndex(t => t.id === id);
+      if (idx !== -1) {
+        demoTrips[idx] = updatedTrip;
+        localStorage.setItem('demo_trips', JSON.stringify(demoTrips));
+      }
+      setTrip(updatedTrip);
+      addToast('Itinerary sections saved locally (Offline Fallback)!', 'success');
+    } finally {
+      setSavingSections(false);
+    }
+  };
+
   // Fetch single trip
   const fetchTripDetails = async () => {
     try {
@@ -78,7 +179,7 @@ export default function TripBuilder() {
         const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
         let found = demoTrips.find(t => t.id === id);
         if (!found) found = MOCK_TRIPS.find(t => t.id === id);
-        
+
         if (found) {
           setTrip(found);
         } else {
@@ -96,7 +197,7 @@ export default function TripBuilder() {
       const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
       let found = demoTrips.find(t => t.id === id);
       if (!found) found = MOCK_TRIPS.find(t => t.id === id);
-      
+
       if (found) {
         setTrip(found);
       } else {
@@ -142,7 +243,7 @@ export default function TripBuilder() {
   const handleTogglePublish = async () => {
     try {
       const nextPublicState = !trip.isPublic;
-      
+
       if (isDemoMode) {
         const updated = { ...trip, isPublic: nextPublicState };
         setTrip(updated);
@@ -198,7 +299,7 @@ export default function TripBuilder() {
       if (isDemoMode) {
         let updatedItinerary = [...(trip.itinerary || [])];
         if (editingItem) {
-          updatedItinerary = updatedItinerary.map(item => 
+          updatedItinerary = updatedItinerary.map(item =>
             item.id === editingItem.id ? { ...item, ...itemPayload } : item
           );
           addToast('Activity updated!', 'success');
@@ -231,7 +332,7 @@ export default function TripBuilder() {
         }
         await fetchTripDetails();
       }
-      
+
       // Clear forms
       setIsActivityModalOpen(false);
       setEditingItem(null);
@@ -364,10 +465,10 @@ export default function TripBuilder() {
   // CALCULATE EXPENSE SUMS
   const getExpensesSum = () => {
     if (!trip) return { total: 0, itineraryTotal: 0, generalTotal: 0 };
-    
+
     const itineraryTotal = (trip.itinerary || []).reduce((sum, item) => sum + (item.cost || 0), 0);
     const generalTotal = (trip.expenses || []).reduce((sum, exp) => sum + (exp.amount || 0), 0);
-    
+
     return {
       total: itineraryTotal + generalTotal,
       itineraryTotal,
@@ -381,7 +482,7 @@ export default function TripBuilder() {
   // Group chart data
   const getChartData = () => {
     if (!trip) return [];
-    
+
     const groups = {};
     CATEGORIES.forEach(cat => { groups[cat] = 0; });
 
@@ -464,8 +565,8 @@ export default function TripBuilder() {
             <button
               onClick={handleTogglePublish}
               className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                trip.isPublic 
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                trip.isPublic
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   : 'bg-white hover:bg-stone-50 text-stone-600 border-stone-200'
               }`}
             >
@@ -501,8 +602,8 @@ export default function TripBuilder() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-6 py-3 border-b-2 font-bold text-xs uppercase tracking-wider transition-colors ${
-                isActive 
-                  ? 'border-primary text-primary' 
+                isActive
+                  ? 'border-primary text-primary'
                   : 'border-transparent text-stone-500 hover:text-stone-800'
               }`}
             >
@@ -515,105 +616,133 @@ export default function TripBuilder() {
 
       {/* VIEW: ITINERARY DAY-WISE */}
       {activeTab === 'itinerary' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-in">
           <div className="flex justify-between items-center">
-            <h2 className="font-display font-bold text-lg text-text-dark">Itinerary Planner</h2>
+            <h2 className="font-display font-bold text-lg text-text-dark">Itinerary Sections</h2>
             <button
-              onClick={() => {
-                setEditingItem(null);
-                setActivityName('');
-                setActivityCost('');
-                setActivityNotes('');
-                setActivityDate(trip.startDate);
-                setIsActivityModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 py-2 px-4 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition-colors shadow-xs"
+              onClick={handleSaveSections}
+              disabled={savingSections}
+              className="inline-flex items-center gap-1.5 py-2.5 px-4 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              Add Activity
+              {savingSections ? (
+                <>
+                  <svg className="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>Save Itinerary Sections</span>
+              )}
             </button>
           </div>
 
-          <div className="space-y-8">
-            {tripDays.map((day, dIdx) => {
-              // Get activities for this day
-              const dayActivities = (trip.itinerary || [])
-                .filter(item => item.date === day.date)
-                .sort((a, b) => a.time.localeCompare(b.time));
+          <div className="space-y-6">
+            {sections.map((section, index) => (
+              <div
+                key={section.id}
+                className="bg-white border border-stone-200/80 rounded-3xl p-6 shadow-xs relative hover:shadow-md transition-all animate-fade-in"
+              >
+                {/* Delete button */}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSection(section.id)}
+                  className="absolute top-4 right-4 p-1.5 text-stone-400 hover:text-rose-600 transition-colors hover:bg-stone-50 rounded-lg cursor-pointer"
+                  title="Remove this section"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
 
-              return (
-                <div key={day.date} className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                  {/* Day marker card */}
-                  <div className="bg-white border border-stone-200 p-5 rounded-2xl shadow-xs">
-                    <div className="text-xs font-bold text-primary uppercase tracking-wider">Day {dIdx + 1}</div>
-                    <div className="text-base font-bold text-text-dark mt-0.5">{day.label}</div>
-                    {day.stop ? (
-                      <div className="inline-flex items-center gap-1 mt-3 px-2 py-0.5 bg-stone-100 text-stone-600 rounded-md text-[10px] font-bold uppercase tracking-wide">
-                        <MapPin className="w-3 h-3 text-stone-400" />
-                        {day.stop.city}
-                      </div>
-                    ) : (
-                      <div className="text-[10px] text-text-muted mt-2 italic">Transit day / No stop mapped</div>
-                    )}
+                <div className="grid grid-cols-1 gap-5">
+                  {/* Section Title */}
+                  <div>
+                    <label className="block text-xs font-bold text-text-dark uppercase tracking-wider mb-1.5">
+                      Section Title
+                    </label>
+                    <input
+                      type="text"
+                      value={section.title}
+                      onChange={(e) => handleUpdateSection(section.id, 'title', e.target.value)}
+                      placeholder={`e.g. Section ${index + 1}`}
+                      className="w-full p-2.5 bg-bg-warm border border-stone-200 rounded-xl text-sm font-semibold text-stone-800 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
                   </div>
 
-                  {/* Day Activities list */}
-                  <div className="lg:col-span-3 space-y-4">
-                    {dayActivities.length === 0 ? (
-                      <div className="bg-stone-50 border border-stone-200 border-dashed p-6 rounded-2xl text-center text-xs text-text-muted">
-                        No activities scheduled for this day. Click "Add Activity" to plan your time.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {dayActivities.map(act => (
-                          <div 
-                            key={act.id} 
-                            className="bg-white border border-stone-200/80 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-stone-300 transition-colors"
-                          >
-                            <div className="flex items-start gap-3.5">
-                              <div className="p-2 bg-stone-100 rounded-lg text-stone-500 shrink-0 mt-0.5">
-                                <Clock className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-bold text-stone-900 text-sm">{act.time}</span>
-                                  <span className="font-semibold text-text-dark text-sm">{act.activityName}</span>
-                                  <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-stone-100 text-stone-600 uppercase tracking-wider">
-                                    {act.category}
-                                  </span>
-                                </div>
-                                {act.notes && (
-                                  <p className="text-xs text-text-muted mt-1 italic font-medium">{act.notes}</p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between sm:justify-end gap-5 w-full sm:w-auto border-t sm:border-t-0 border-stone-100 pt-2 sm:pt-0">
-                              <span className="font-bold text-sm text-emerald-600 shrink-0">
-                                {act.cost > 0 ? `$${act.cost}` : 'Free'}
-                              </span>
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => handleOpenEditActivity(act)}
-                                  className="p-1.5 text-stone-400 hover:text-primary transition-colors hover:bg-stone-50 rounded-lg"
-                                >
-                                  <Edit3 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteActivity(act.id)}
-                                  className="p-1.5 text-stone-400 hover:text-rose-600 transition-colors hover:bg-stone-50 rounded-lg"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  {/* Description Area */}
+                  <div>
+                    <label className="block text-xs font-bold text-text-dark uppercase tracking-wider mb-1.5">
+                      Information / Description Area
+                    </label>
+                    <textarea
+                      rows={2.5}
+                      value={section.description}
+                      onChange={(e) => handleUpdateSection(section.id, 'description', e.target.value)}
+                      placeholder="Add descriptions or specific lists of landmarks and details here..."
+                      className="w-full p-2.5 bg-bg-warm border border-stone-200 rounded-xl text-sm font-medium text-stone-800 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                  </div>
+
+                  {/* Date Range & Budget */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-text-dark uppercase tracking-wider mb-1.5">
+                        Start Date
+                      </label>
+                      <input
+                        type="date"
+                        value={section.startDate}
+                        onChange={(e) => handleUpdateSection(section.id, 'startDate', e.target.value)}
+                        className="w-full p-2.5 bg-bg-warm border border-stone-200 rounded-xl text-xs font-semibold text-stone-850 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-text-dark uppercase tracking-wider mb-1.5">
+                        End Date
+                      </label>
+                      <input
+                        type="date"
+                        value={section.endDate}
+                        onChange={(e) => handleUpdateSection(section.id, 'endDate', e.target.value)}
+                        className="w-full p-2.5 bg-bg-warm border border-stone-200 rounded-xl text-xs font-semibold text-stone-850 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-text-dark uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                        <Wallet className="w-3.5 h-3.5 text-stone-400" />
+                        Section Budget ($)
+                      </label>
+                      <input
+                        type="number"
+                        value={section.budget}
+                        onChange={(e) => handleUpdateSection(section.id, 'budget', Number(e.target.value))}
+                        placeholder="e.g. 500"
+                        className="w-full p-2.5 bg-bg-warm border border-stone-200 rounded-xl text-sm font-semibold text-stone-800 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      />
+                    </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
+
+            {sections.length === 0 && (
+              <div className="bg-bg-warm border border-stone-200 border-dashed p-8 rounded-3xl text-center text-xs text-text-muted">
+                No sections added. Click "+ Add another Section" below to create one.
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={handleAddSection}
+              className="inline-flex items-center gap-1.5 py-3 px-6 bg-secondary hover:bg-secondary-hover text-white text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add another Section</span>
+            </button>
           </div>
         </div>
       )}
@@ -657,7 +786,7 @@ export default function TripBuilder() {
             {/* Left: Recharts expense distribution */}
             <div className="bg-white border border-stone-200 p-6 rounded-3xl">
               <h3 className="font-display font-bold text-base text-text-dark mb-4">Category Distribution</h3>
-              
+
               {chartData.length === 0 ? (
                 <div className="h-64 flex items-center justify-center text-text-muted text-xs italic">
                   No costs recorded. Plan some activities to view chart distribution.
@@ -704,8 +833,8 @@ export default function TripBuilder() {
               ) : (
                 <div className="space-y-3 max-h-[250px] overflow-y-auto pr-1">
                   {trip.expenses.map((exp) => (
-                    <div 
-                      key={exp.id} 
+                    <div
+                      key={exp.id}
                       className="flex items-center justify-between p-3.5 bg-bg-warm border border-stone-200 rounded-xl hover:border-stone-300 transition-colors"
                     >
                       <div>
@@ -736,7 +865,7 @@ export default function TripBuilder() {
       {activeTab === 'timeline' && (
         <div className="bg-white border border-stone-200 p-6 md:p-8 rounded-3xl space-y-8">
           <h2 className="font-display font-bold text-lg text-text-dark">Journey Timeline</h2>
-          
+
           <div className="relative border-l-2 border-primary/20 pl-6 ml-4 space-y-8 py-2">
             {trip.stops?.map((stop, sIdx) => {
               // Find activities mapped under this stop's date bounds
@@ -751,7 +880,7 @@ export default function TripBuilder() {
                 <div key={stop.id || sIdx} className="relative group">
                   {/* Timeline dot */}
                   <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-primary border-4 border-white shadow-xs group-hover:scale-110 transition-transform" />
-                  
+
                   <div className="space-y-2">
                     <span className="text-[10px] font-extrabold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                       Stop {sIdx + 1}

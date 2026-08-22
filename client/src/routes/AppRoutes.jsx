@@ -8,6 +8,7 @@ import Layout from '../components/layout/Layout';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import Dashboard from '../pages/Dashboard';
+import MainLanding from '../pages/MainLanding';
 import Explore from '../pages/Explore';
 import CreateTrip from '../pages/CreateTrip';
 import TripBuilder from '../pages/TripBuilder';
@@ -74,7 +75,7 @@ const AppRoutes = () => {
         path="/dashboard" 
         element={
           <PrivateRoute>
-            <Dashboard />
+            <MainLanding />
           </PrivateRoute>
         } 
       />
