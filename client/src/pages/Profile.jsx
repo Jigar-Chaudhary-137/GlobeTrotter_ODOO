@@ -14,11 +14,13 @@ import {
   Wallet,
   Settings,
   Compass,
-  ArrowRight
+  ArrowRight,
+  Camera,
+  Loader2
 } from 'lucide-react';
 
 export default function Profile() {
-  const { user, updateProfile, isDemoMode } = useAuth();
+  const { user, updateProfile, uploadProfilePhoto, isDemoMode } = useAuth();
   const { addToast } = useToast();
 
   const [name, setName] = useState('');
@@ -28,6 +30,7 @@ export default function Profile() {
   
   const [trips, setTrips] = useState([]);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   // Initialize fields
   useEffect(() => {
@@ -35,7 +38,7 @@ export default function Profile() {
       setName(user.name || '');
       setCity(user.city || '');
       setCountry(user.country || '');
-      setAvatar(user.avatar || '');
+      setAvatar(user.profilePic || user.avatar || '');
     }
   }, [user]);
 
@@ -64,6 +67,33 @@ export default function Profile() {
     fetchTrips();
   }, [isDemoMode]);
 
+  const handlePhotoSelect = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      addToast("File size exceeds 5 MB limit.", "error");
+      return;
+    }
+
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      addToast("Invalid file type. Please select JPEG, PNG, or WebP.", "error");
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const res = await uploadProfilePhoto(file);
+      addToast(res.message || "Profile photo uploaded successfully!", "success");
+    } catch (err) {
+      console.error("Photo upload failed:", err);
+      addToast(err.message || "Failed to upload photo.", "error");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -77,7 +107,7 @@ export default function Profile() {
         name,
         city,
         country,
-        avatar: avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'
+        profilePic: avatar || user?.profilePic || user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'
       });
       addToast("Profile updated successfully!", "success");
     } catch (err) {
@@ -92,11 +122,29 @@ export default function Profile() {
     <div className="space-y-8 animate-fade-in font-sans text-sm">
       {/* Profile Overview Hero */}
       <div className="bg-white border border-stone-200 p-6 md:p-8 rounded-3xl shadow-xs flex flex-col sm:flex-row items-center gap-6">
-        <img 
-          src={user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'} 
-          alt={user?.name}
-          className="w-20 h-20 rounded-full border-2 border-primary object-cover shrink-0"
-        />
+        <div className="relative group w-20 h-20 shrink-0">
+          <img 
+            src={user?.profilePic || user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'} 
+            alt={user?.name}
+            className="w-20 h-20 rounded-full border-2 border-primary object-cover"
+          />
+          <label 
+            htmlFor="profile-photo-input"
+            className="absolute bottom-0 right-0 p-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-full border-2 border-white shadow-xs cursor-pointer transition-transform hover:scale-110"
+            title="Upload profile photo to Supabase Storage"
+          >
+            {isUploadingPhoto ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+            <input 
+              id="profile-photo-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handlePhotoSelect}
+              className="hidden"
+              disabled={isUploadingPhoto}
+            />
+          </label>
+        </div>
+
         <div className="text-center sm:text-left space-y-1.5">
           <h1 className="font-display font-extrabold text-2xl text-text-dark tracking-tight leading-none">{user?.name}</h1>
           <div className="text-xs text-text-muted font-semibold flex flex-wrap justify-center sm:justify-start items-center gap-x-3 gap-y-1">
@@ -116,6 +164,7 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left: Edit Profile Form */}

@@ -141,10 +141,62 @@ const deleteSavedDestination = async (req, res, next) => {
   }
 };
 
+// POST /api/profile/photo
+const uploadProfilePhoto = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return errorResponse(res, 400, 'Please provide an image file under the photo form field.');
+    }
+
+    const { uploadProfileImage, deleteProfileImage } = require('../config/supabase');
+
+    // Obtain current profile info to clean up old image if present
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { profilePic: true },
+    });
+
+    // Upload to Supabase Storage
+    const { publicUrl } = await uploadProfileImage(req.file.buffer, req.file.mimetype, req.user.id);
+
+    // Update User.profilePic in PostgreSQL via Prisma
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        profilePic: publicUrl,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        city: true,
+        country: true,
+        bio: true,
+        profilePic: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+
+    // Safely attempt cleanup of previous image in background
+    if (currentUser && currentUser.profilePic) {
+      deleteProfileImage(currentUser.profilePic).catch((err) =>
+        console.warn('Background cleanup of old profile image failed:', err.message)
+      );
+    }
+
+    return successResponse(res, 200, 'Profile photo uploaded successfully', updatedUser);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getProfile,
   updateProfile,
+  uploadProfilePhoto,
   getSavedDestinations,
   addSavedDestination,
   deleteSavedDestination,
 };
+

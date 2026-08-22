@@ -151,16 +151,45 @@ export const AuthProvider = ({ children }) => {
     }
     
     const response = await authService.updateProfile(profileData);
-    setUser(response.user);
-    localStorage.setItem('globetrotter_user', JSON.stringify(response.user));
+    const updatedUser = response.data || response.user || response;
+    const finalUser = {
+      ...user,
+      ...updatedUser,
+      avatar: updatedUser.profilePic || updatedUser.avatar || user?.avatar,
+    };
+    setUser(finalUser);
+    localStorage.setItem('globetrotter_user', JSON.stringify(finalUser));
     return response;
   };
 
+  const uploadProfilePhoto = async (file) => {
+    if (isDemoMode) {
+      const mockUrl = URL.createObjectURL(file);
+      const updated = { ...user, profilePic: mockUrl, avatar: mockUrl };
+      setUser(updated);
+      localStorage.setItem('globetrotter_user', JSON.stringify(updated));
+      return { success: true, user: updated, message: 'Photo updated in demo mode.' };
+    }
+
+    const response = await authService.uploadProfilePhoto(file);
+    const updatedUser = response.data || response.user || response;
+    const finalUser = {
+      ...user,
+      ...updatedUser,
+      profilePic: updatedUser.profilePic,
+      avatar: updatedUser.profilePic || updatedUser.avatar,
+    };
+    setUser(finalUser);
+    localStorage.setItem('globetrotter_user', JSON.stringify(finalUser));
+    return { success: true, user: finalUser, message: 'Profile photo uploaded successfully.' };
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, error, isDemoMode, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, loading, error, isDemoMode, login, register, logout, updateProfile, uploadProfilePhoto }}>
       {children}
     </AuthContext.Provider>
   );
+
 };
 
 export const useAuth = () => {

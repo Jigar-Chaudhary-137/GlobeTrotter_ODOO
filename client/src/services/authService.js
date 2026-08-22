@@ -19,5 +19,13 @@ export const authService = {
   updateProfile: async (profileData) => {
     const response = await api.put('/profile', profileData);
     return response.data;
+  },
+
+  uploadProfilePhoto: async (file) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const response = await api.post('/profile/photo', formData);
+    return response.data;
   }
 };
+
