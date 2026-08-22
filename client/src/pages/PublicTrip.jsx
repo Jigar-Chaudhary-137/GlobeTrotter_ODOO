@@ -12,7 +12,9 @@ import {
   Copy, 
   Heart,
   Globe,
-  PlaneTakeoff
+  PlaneTakeoff,
+  AlertCircle,
+  Compass
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -38,40 +40,61 @@ export default function PublicTrip() {
   const [likes, setLikes] = useState(0);
   const [liked, setLiked] = useState(false);
   const [liking, setLiking] = useState(false);
+  const [errorStatus, setErrorStatus] = useState(null);
 
   // Fetch shared trip details
   const fetchSharedTrip = async () => {
+    setLoading(true);
+    setErrorStatus(null);
     try {
       if (isDemoMode) {
         const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
         let found = demoTrips.find(t => t.id === shareId || t.shareId === shareId);
         if (!found) found = MOCK_TRIPS.find(t => t.id === shareId || t.shareId === shareId);
         
-        setTrip(found);
-        setLikes(found?.likes || 24);
+        if (found) {
+          setTrip(found);
+          setLikes(found?.likes || 24);
+        } else {
+          setErrorStatus('NOT_FOUND');
+        }
         setLoading(false);
         return;
       }
 
       const response = await communityService.getPublicTripById(shareId);
       const tripData = response.data || response.trip || response;
-      setTrip(tripData);
-      setLikes(tripData._count?.communityLikes ?? tripData.likes ?? 0);
-      setLiked(Boolean(tripData.isLiked));
+      
+      if (tripData) {
+        setTrip(tripData);
+        setLikes(tripData._count?.communityLikes ?? tripData.likes ?? 0);
+        setLiked(Boolean(tripData.isLiked));
+      } else {
+        setErrorStatus('NOT_FOUND');
+      }
     } catch (err) {
-      console.warn("Public trip API failed, searching local fallback:", err);
+      console.warn("Public trip API failed:", err);
+      // Fallback search in local cache
       const demoTrips = JSON.parse(localStorage.getItem('demo_trips') || '[]');
       let found = demoTrips.find(t => t.id === shareId || t.shareId === shareId);
       if (!found) found = MOCK_TRIPS.find(t => t.id === shareId || t.shareId === shareId);
-      setTrip(found);
-      setLikes(found?.likes || 24);
+      
+      if (found) {
+        setTrip(found);
+        setLikes(found?.likes || 24);
+      } else {
+        const status = err.response?.status === 403 ? 'PRIVATE' : 'NOT_FOUND';
+        setErrorStatus(status);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSharedTrip();
+    if (shareId) {
+      fetchSharedTrip();
+    }
   }, [shareId, isDemoMode]);
 
   // Copy trip action
@@ -214,19 +237,41 @@ export default function PublicTrip() {
     return (
       <div className="min-h-screen bg-bg-warm flex flex-col items-center justify-center p-8">
         <Loader size="lg" />
-        <span className="text-text-muted mt-2 text-xs font-semibold animate-pulse">Loading Shared Trip...</span>
+        <span className="text-text-muted mt-3 text-xs font-semibold animate-pulse">Loading Public Itinerary...</span>
       </div>
     );
   }
 
-  if (!trip) {
+  if (errorStatus || !trip) {
     return (
-      <div className="min-h-screen bg-bg-warm flex flex-col items-center justify-center p-8">
-        <div className="text-center py-6">
-          <p className="text-text-muted text-sm font-semibold">Shared trip could not be found or link is private.</p>
-          <Link to="/dashboard" className="text-primary hover:underline text-sm font-bold mt-4 inline-block">
-            Go to Dashboard
-          </Link>
+      <div className="min-h-screen bg-bg-warm flex flex-col items-center justify-center p-6">
+        <div className="bg-white border border-stone-200 p-8 rounded-3xl max-w-md w-full text-center space-y-4 shadow-sm animate-fade-in">
+          <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-100">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="font-display font-extrabold text-xl text-stone-900">
+            {errorStatus === 'PRIVATE' ? 'Trip No Longer Public' : 'Public Trip Not Found'}
+          </h2>
+          <p className="text-text-muted text-xs leading-relaxed">
+            {errorStatus === 'PRIVATE' 
+              ? 'This travel plan has been set to private by its creator.' 
+              : 'This itinerary may have been removed by its creator or the public share URL is invalid.'}
+          </p>
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link 
+              to="/explore" 
+              className="w-full sm:w-auto px-4 py-2.5 bg-primary text-white font-bold text-xs rounded-xl hover:bg-primary-hover transition-colors inline-flex items-center justify-center gap-1.5"
+            >
+              <Compass className="w-4 h-4" />
+              Explore Destinations
+            </Link>
+            <Link 
+              to="/dashboard" 
+              className="w-full sm:w-auto px-4 py-2.5 border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-bold text-xs rounded-xl transition-colors inline-flex items-center justify-center gap-1.5"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
         </div>
       </div>
     );

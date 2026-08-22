@@ -20,7 +20,8 @@ import {
   Layers,
   Activity,
   UserCheck,
-  Globe
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -267,11 +268,38 @@ export default function TripBuilder() {
 
   // Copy share URL
   const handleCopyLink = () => {
-    const shareUrl = `${window.location.origin}/public/trips/${trip.id}`;
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    addToast('Link copied to clipboard!', 'success');
-    setTimeout(() => setCopied(false), 2000);
+    const targetShareId = trip.shareId || trip.id;
+    const shareUrl = `${window.location.origin}/public/trips/${targetShareId}`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl)
+        .then(() => {
+          setCopied(true);
+          addToast('Share link copied to clipboard!', 'success');
+          setTimeout(() => setCopied(false), 2000);
+        })
+        .catch(() => {
+          fallbackCopyText(shareUrl);
+        });
+    } else {
+      fallbackCopyText(shareUrl);
+    }
+  };
+
+  const fallbackCopyText = (text) => {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      addToast('Share link copied to clipboard!', 'success');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_) {
+      addToast('Failed to copy link automatically. Please copy manually.', 'error');
+    }
   };
 
   // Submit Itinerary Item (Create or Edit)
@@ -581,11 +609,42 @@ export default function TripBuilder() {
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white hover:bg-primary-hover rounded-xl text-xs font-bold transition-colors shadow-xs"
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                Share Link
+                {copied ? 'Copied!' : 'Copy Share Link'}
               </button>
             )}
           </div>
         </div>
+
+        {/* Public Share Banner */}
+        {trip.isPublic && (
+          <div className="mt-4 pt-4 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-50/80 p-3.5 rounded-2xl animate-fade-in">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Share2 className="w-4 h-4 text-primary shrink-0" />
+              <span className="text-xs font-bold text-stone-700 shrink-0">Public Share Link:</span>
+              <span className="text-xs text-text-muted font-mono truncate bg-white px-2.5 py-1 rounded-lg border border-stone-200 select-all">
+                {`${window.location.origin}/public/trips/${trip.shareId || trip.id}`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleCopyLink}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-primary text-white hover:bg-primary-hover rounded-xl text-xs font-bold transition-colors shadow-xs"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? 'Copied!' : 'Copy Link'}
+              </button>
+              <a
+                href={`/public/trips/${trip.shareId || trip.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-3.5 py-1.5 border border-stone-200 bg-white hover:bg-stone-100 text-stone-700 text-xs font-bold rounded-xl transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-stone-500" />
+                Open Public View
+              </a>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tab Navigation */}
