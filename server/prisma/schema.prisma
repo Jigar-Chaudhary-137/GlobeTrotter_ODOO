@@ -33,6 +33,7 @@ model User {
   password         String
   city             String?
   country          String?
+  phone            String?
   bio              String?
   profilePic       String?
   role             Role               @default(USER)
