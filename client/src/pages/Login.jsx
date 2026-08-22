@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Mail, Lock, Eye, EyeOff, PlaneTakeoff, Loader2 } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, Loader2, Compass } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
@@ -19,10 +19,10 @@ export default function Login() {
 
   const validateForm = () => {
     const errors = {};
-    if (!email) {
-      errors.email = 'Email address is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      errors.email = 'Please enter a valid email address';
+    if (!username.trim()) {
+      errors.username = 'Username is required';
+    } else if (!/\S+@\S+\.\S+/.test(username)) {
+      errors.username = 'Please enter a valid email address';
     }
     
     if (!password) {
@@ -43,7 +43,8 @@ export default function Login() {
     setApiError('');
 
     try {
-      const result = await login(email, password);
+      // Map username to the first parameter (email) of the login handler
+      const result = await login(username, password);
       addToast(result.message, 'success');
       navigate('/dashboard');
     } catch (err) {
@@ -55,63 +56,77 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-warm flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 text-primary mb-4 shadow-xs">
-          <PlaneTakeoff className="w-8 h-8" />
+    <div className="min-h-screen bg-bg-warm flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-6">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 text-primary mb-3 shadow-xs">
+          <Compass className="w-9 h-9" />
         </div>
-        <h2 className="font-display font-extrabold text-3xl text-text-dark tracking-tight">
-          Welcome to GlobeTrotter
-        </h2>
+        <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-text-dark tracking-tight">
+          GlobeTrotter
+        </h1>
         <p className="mt-2 text-sm text-text-muted">
-          Your journey begins here. Discover, plan, and share.
+          Your personal travel map & memory journal.
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-surface py-8 px-4 border border-stone-200 shadow-xl rounded-3xl sm:px-10">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        {/* Card Container */}
+        <div className="bg-surface py-8 px-6 border border-stone-200/80 shadow-2xl rounded-3xl sm:px-10 transition-all hover:shadow-primary/5">
+          {/* Photo/profile visual */}
+          <div className="relative w-24 h-24 mx-auto mb-6 group">
+            <div className="absolute inset-0 rounded-full bg-linear-to-tr from-primary to-secondary animate-pulse opacity-20 group-hover:opacity-40 transition-opacity"></div>
+            <img
+              src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=120&h=120&q=80"
+              alt="Traveler Profile"
+              className="relative w-full h-full rounded-full border-4 border-surface shadow-md object-cover transform transition-transform duration-300 group-hover:scale-105"
+            />
+          </div>
+
           <form className="space-y-6" onSubmit={handleSubmit} noValidate>
             {apiError && (
-              <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 text-sm font-medium">
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 text-sm font-medium transition-all">
                 {apiError}
               </div>
             )}
 
-            {/* Email Field */}
+            {/* Username Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-text-dark">
-                Email address
+              <label htmlFor="username" className="block text-sm font-semibold text-text-dark">
+                Username
               </label>
               <div className="mt-1.5 relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-stone-400" />
+                  <User className="h-5 w-5 text-stone-400" />
                 </div>
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
+                  id="username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  disabled={isSubmitting}
+                  value={username}
                   onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (formErrors.email) setFormErrors({ ...formErrors, email: '' });
+                    setUsername(e.target.value);
+                    if (formErrors.username) setFormErrors({ ...formErrors, username: '' });
                   }}
                   className={`block w-full pl-11 pr-4 py-2.5 bg-bg-warm border rounded-xl text-stone-900 placeholder-stone-400 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm ${
-                    formErrors.email ? 'border-rose-300 ring-2 ring-rose-500/10' : 'border-stone-200'
+                    formErrors.username ? 'border-rose-300 ring-2 ring-rose-500/10' : 'border-stone-200'
                   }`}
-                  placeholder="you@example.com"
+                  placeholder="traveler@globetrotter.com"
                 />
               </div>
-              {formErrors.email && (
-                <p className="mt-1 text-xs text-rose-600 font-medium">{formErrors.email}</p>
+              {formErrors.username && (
+                <p className="mt-1 text-xs text-rose-600 font-medium">{formErrors.username}</p>
               )}
             </div>
 
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-text-dark">
-                Password
-              </label>
+              <div className="flex justify-between items-center">
+                <label htmlFor="password" className="block text-sm font-semibold text-text-dark">
+                  Password
+                </label>
+              </div>
               <div className="mt-1.5 relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-stone-400" />
@@ -121,6 +136,7 @@ export default function Login() {
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
+                  disabled={isSubmitting}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -144,15 +160,18 @@ export default function Login() {
               )}
             </div>
 
-            {/* Action Buttons */}
+            {/* Submit Button */}
             <div>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-xs text-sm font-semibold text-white bg-primary hover:bg-primary-hover focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors disabled:opacity-50"
+                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-semibold text-white bg-primary hover:bg-primary-hover focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all hover:shadow-lg active:scale-98 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
               >
                 {isSubmitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    <span>Signing in...</span>
+                  </>
                 ) : (
                   'Sign In'
                 )}
@@ -160,11 +179,12 @@ export default function Login() {
             </div>
           </form>
 
-          <div className="mt-6 border-t border-stone-200 pt-6 text-center">
-            <p className="text-sm text-text-muted">
-              Don't have an account?{' '}
+          {/* Navigation to Register */}
+          <div className="mt-6 border-t border-stone-200/80 pt-6 text-center">
+            <p className="text-sm text-text-muted font-sans">
+              New to GlobeTrotter?{' '}
               <Link to="/register" className="font-semibold text-primary hover:text-primary-hover transition-colors">
-                Create one now
+                Create an account
               </Link>
             </p>
           </div>

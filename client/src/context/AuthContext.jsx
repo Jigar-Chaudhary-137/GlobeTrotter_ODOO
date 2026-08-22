@@ -91,11 +91,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password) => {
+  const register = async (name, email, password, phone, city, country, additionalInfo, avatar) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await authService.register({ name, email, password });
+      const data = await authService.register({ name, email, password, phone, city, country, additionalInfo, avatar });
       setUser(data.user);
       setIsDemoMode(false);
       localStorage.setItem('globetrotter_token', data.token);
@@ -112,9 +112,11 @@ export const AuthProvider = ({ children }) => {
           id: 'user-demo',
           name: name,
           email: email,
-          city: 'Mumbai',
-          country: 'India',
-          avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'
+          phone: phone,
+          city: city || 'Mumbai',
+          country: country || 'India',
+          bio: additionalInfo,
+          avatar: avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&h=80&q=80'
         };
         setUser(mockUser);
         setIsDemoMode(true);
